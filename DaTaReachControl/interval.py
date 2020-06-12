@@ -7,7 +7,14 @@ class Interval:
     :param ub: The upper bound of the interval, can be +-np.Inf.
     """
 
-    def __init__(self, lb=0, ub=0):
+    def __init__(self, lb=None, ub=None):
+        if lb is None and ub is None:
+            lb = 0
+            ub = 0
+        if lb is None and ub is not None:
+            lb = ub
+        if lb is not None and ub is None:
+            ub = lb
         assert lb <= ub, \
             "Lower bound {} must be less than upper bound {}".format(lb,ub)
         self.lb = float(lb)
@@ -113,6 +120,13 @@ class Interval:
         assert self.__ge__(0), "Interval {} is negative".format(self)
         return Interval(np.sqrt(self.lb), np.sqrt(self.ub))
 
+    def contains(self, val):
+        if isinstance(val, int) or isinstance(val, float):
+            return self.lb <= val and self.ub >= val
+        if isinstance(val, Interval):
+            return self.lb <= val.lb and self.ub >= val.ub
+        assert False, 'Wrong type {} for contains'.format(type(val))
+
     def __abs__(self):
         if self.__ge__(0):
             return Interval(self.lb,self.ub)
@@ -130,7 +144,7 @@ class Interval:
 
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.lb == self. ub and self.lb == other
+            return self.lb == other and self.ub == other
         if isinstance(other, Interval):
             return self.lb == other.lb and self.ub == other.ub
         assert False, 'Not the same object {}'.format(type(other))
