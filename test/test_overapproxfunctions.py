@@ -75,7 +75,7 @@ def test_Gover():
     sizeTest = 10
     xVal = np.random.random((2,sizeTest))
     xDotVal = np.zeros((2,sizeTest))
-    uSeq = np.random.random((2,sizeTest))
+    uSeq = 0.1 * np.random.randint(low=1, high=10, size=(2,sizeTest))
     while True:
         choiceVal = [-1,0,1]
         picVal = [False, False, False]
