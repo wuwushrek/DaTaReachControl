@@ -6,8 +6,18 @@ class Interval:
     :param lb: The lower bound of the interval, can be +-np.Inf.
     :param ub: The upper bound of the interval, can be +-np.Inf.
     """
+    # Consider value below this threshold as 0
+    epsTol = 1e-12
 
     def __init__(self, lb=None, ub=None):
+        if isinstance(lb, Interval):
+            self.lb = lb.lb
+            self.ub = lb.ub
+            return
+        if isinstance(ub, Interval):
+            self.lb = ub.lb
+            self.ub = ub.ub
+            return
         if lb is None and ub is None:
             lb = 0
             ub = 0
@@ -15,10 +25,14 @@ class Interval:
             lb = ub
         if lb is not None and ub is None:
             ub = lb
-        assert lb <= ub, \
-            "Lower bound {} must be less than upper bound {}".format(lb,ub)
-        self.lb = float(lb)
-        self.ub = float(ub)
+        if np.abs(lb-ub) >= Interval.epsTol:
+            assert lb <= ub,\
+                "Lower bound {} must be less than upper bound {}".format(lb,ub)
+            self.lb = float(lb)
+            self.ub = float(ub)
+        else:
+            self.lb = float(ub)
+            self.ub = float(ub)
 
     @property
     def lb(self):
@@ -66,6 +80,9 @@ class Interval:
         assert False, 'Substraction not defined for type {}'.format(type(other))
 
     def __mul__(self, other):
+        if self is other:
+            # print(self, other)
+            return self.__pow__(2)
         if isinstance(other, int) or isinstance(other, float):
             if other <= 0:
                 return Interval(self.ub*other, self.lb*other)
@@ -120,11 +137,16 @@ class Interval:
         assert self.__ge__(0), "Interval {} is negative".format(self)
         return Interval(np.sqrt(self.lb), np.sqrt(self.ub))
 
+    def conjugate(self):
+        return self
+
     def contains(self, val):
         if isinstance(val, int) or isinstance(val, float):
-            return self.lb <= val and self.ub >= val
+            return self.lb-val <= Interval.epsTol and \
+                                self.ub-val >= -Interval.epsTol
         if isinstance(val, Interval):
-            return self.lb <= val.lb and self.ub >= val.ub
+            return self.lb-val.lb <= Interval.epsTol and \
+                                self.ub-val.ub >= -Interval.epsTol
         assert False, 'Wrong type {} for contains'.format(type(val))
 
     def __abs__(self):
@@ -136,7 +158,9 @@ class Interval:
 
     def __and__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            assert self.lb <= other and self.ub >= other, " Empty intersection"
+            assert self.lb-other<=Interval.epsTol and \
+                            self.ub-other >= -Interval.epsTol, \
+                    " Empty intersection"
             return Interval(other, other)
         if isinstance(other, Interval):
             return Interval(max(self.lb,other.lb), min(self.ub, other.ub))
@@ -144,9 +168,11 @@ class Interval:
 
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.lb == other and self.ub == other
+            return np.abs(self.lb-other) <= Interval.epsTol and \
+                                np.abs(self.ub-other) <= Interval.epsTol
         if isinstance(other, Interval):
-            return self.lb == other.lb and self.ub == other.ub
+            return np.abs(self.lb-other.lb)<=Interval.epsTol and \
+                                    np.abs(self.ub-other.ub)<=Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
 
     def __ne__(self, other):
@@ -154,28 +180,28 @@ class Interval:
 
     def __lt__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.ub < other
+            return self.ub - other < Interval.epsTol
         if isinstance(other, Interval):
-            return self.ub < other.lb
+            return self.ub - other.lb < Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
 
     def __gt__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.lb > other
+            return self.lb - other > -Interval.epsTol
         if isinstance(other, Interval):
-            return self.lb > other.ub
+            return self.lb - other.ub > -Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
 
     def __le__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.ub <= other
+            return self.ub - other <= Interval.epsTol
         if isinstance(other, Interval):
-            return self.ub <= other.lb
+            return self.ub - other.lb <= Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
 
     def __ge__(self, other):
         if isinstance(other, int) or isinstance(other, float):
-            return self.lb >= other
+            return self.lb - other >= -Interval.epsTol
         if isinstance(other, Interval):
-            return self.lb >= other.ub
+            return self.lb - other.ub >= -Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
