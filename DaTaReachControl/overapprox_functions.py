@@ -94,12 +94,13 @@ class FOverApprox:
         def fkOver(x):
             assert self.E0x.shape[1] >= 1, "No data to estimate f[{}]".format(k)
             # Compute the distance of x to every point in the data
+            # print(np.repeat(x[self.vDep[k],:], self.E0x.shape[1],axis=1)- self.E0x[self.vDep[k],:])
             norm_v = np.linalg.norm(
                         np.repeat(x[self.vDep[k],:], self.E0x.shape[1],axis=1)\
                         - self.E0x[self.vDep[k],:], axis=0)
             # COmpute the cone around each point in the given trajectory
-            fk_val = self.E0xDot[k,:] + self.Lf[k,0] * norm_v * \
-                                        np.full(norm_v.shape[0], Interval(-1,1))
+            fk_val = self.E0xDot[k,:] + norm_v * \
+                        np.full(norm_v.shape[0], self.Lf[k,0]*Interval(-1,1))
             # Compute the intersection of each cone to get the tightest approx
             finalVal = fk_val[0]
             for i in range(1, fk_val.shape[0]):
@@ -298,8 +299,8 @@ class GOverApprox:
                         np.repeat(x[self.vDep[(k,l)],:], xVal.shape[1],axis=1)\
                         - xVal[self.vDep[(k,l)],:], axis=0)
             # COmpute the cone around each point in the given trajectory
-            Gkl_val = self.xDot[l][k,:] + self.LG[k,l] * norm_v * \
-                                        np.full(norm_v.shape[0], Interval(-1,1))
+            Gkl_val = self.xDot[l][k,:] +  norm_v * \
+                        np.full(norm_v.shape[0], self.LG[k,l] * Interval(-1,1))
             # Compute the intersection of each cone to get the tightest approx
             finalVal = Gkl_val[0]
             for i in range(1, Gkl_val.shape[0]):
