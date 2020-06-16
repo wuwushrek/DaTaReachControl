@@ -37,6 +37,7 @@ class FOverApprox:
         self.bf = bf
         self.E0x = None
         self.E0xDot = None
+        self.time = None
         # Set for each state the variable that they directly depends on
         self.updateVarDependency(nDep)
         # Build the jacobian of f given Lf and the dep+ gradient side info
@@ -46,14 +47,16 @@ class FOverApprox:
             xVal = traj['x']
             xValDot = traj['xDot']
             uVal = traj['u']
+            time = traj.get('t', [None for i in range(xVal.shape[1])])
             for i in range(xVal.shape[1]):
-                self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)], uVal[:,i:(i+1)])
+                self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)],
+                            uVal[:,i:(i+1)], time[i])
         # Build the component over-approximation
         self.fOver = dict()
         for i in range(self.Lf.shape[0]):
             self.fOver[i] = self.createApproxFk(i)
 
-    def update(self, xVal, xDotVal, uVal = None):
+    def update(self, xVal, xDotVal, uVal = None, time=None):
         """Update the trajectory of f based with the new measurement
         xVal and the derivatives xDotVal.
         """
@@ -64,10 +67,14 @@ class FOverApprox:
         if self.E0x is None:
             self.E0x = xVal
             self.E0xDot = xDotVal
+            if time is not None:
+                self.time = np.array([time])
             return
         # Append the new data to the set of data points
         self.E0x = np.concatenate((self.E0x, xVal), axis=1)
         self.E0xDot = np.concatenate((self.E0xDot, xDotVal), axis=1)
+        if time is not None:
+            self.time = np.concatenate((self.time,np.array([time])))
 
     def removeData(self, currX, finalSize=10):
         """Remove data that are "the farthest away" from currX. Specifically,
@@ -82,6 +89,8 @@ class FOverApprox:
         # Preserve only the closest point using norm 2 to the current state
         self.E0x = self.E0x[:,ascendingOrder]
         self.E0xDot = self.E0xDot[:,ascendingOrder]
+        if self.time is not None:
+            self.time = self.time[ascendingOrder]
 
     def createApproxFk(self, k):
         """Create the over-approximation of fk based on the given LIpschitz
@@ -185,6 +194,7 @@ class GOverApprox:
         self.bG = bG
         self.Ej = dict()
         self.xDot = dict()
+        self.time = dict()
         # Set for each state the variable that they directly depends on
         self.updateVarDependency(nDep)
         # Build the jacobian of G given LG and the dep+ gradient side info
@@ -194,8 +204,10 @@ class GOverApprox:
             xVal = traj['x']
             xValDot = traj['xDot']
             uVal = traj['u']
+            time = traj.get('t', [None for i in range(xVal.shape[1])])
             for i in range(xVal.shape[1]):
-                self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)], uVal[:,i:(i+1)])
+                self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)],
+                            uVal[:,i:(i+1)], time[i])
         # Build the component over-approximation
         self.GOver = dict()
         for k in range(self.LG.shape[0]):
@@ -238,7 +250,7 @@ class GOverApprox:
             return self.JG_init
         return JG
 
-    def update(self, xVal, xDotVal, uVal):
+    def update(self, xVal, xDotVal, uVal, time=None):
         """Update the trajectory of G based on the new measurement
         xVal, the derivatives xDotVal and the control uVal."""
 
@@ -252,6 +264,8 @@ class GOverApprox:
         if nZInd not in self.Ej:
             self.Ej[nZInd] = (xVal, xDotVal, np.array([uVal[nZInd,0]]))
             self.xDot[nZInd] = (xDotVal - self.Fover(xVal)) / uVal[nZInd,0]
+            if time is not None:
+                self.time[nZInd] = np.array([time])
             return
         (currX, currXdot, currU) = self.Ej[nZInd]
         currX = np.concatenate((currX, xVal),axis=1)
@@ -260,6 +274,8 @@ class GOverApprox:
         self.Ej[nZInd] =  (currX, currXdot, currU)
         self.xDot[nZInd] = np.concatenate((self.xDot[nZInd],
                             (xDotVal - self.Fover(xVal))/uVal[nZInd,0]), axis=1)
+        if time is not None:
+            self.time[nZInd] = np.concatenate((self.time[nZInd],np.array([time])))
 
 
     def removeData(self, currX, finalSize=10):
@@ -279,6 +295,9 @@ class GOverApprox:
             nuVal = uVal[ascendingOrder]
             self.Ej[ind] = (nxVal, nxDotVal, nuVal)
             self.xDot[ind] = self.xDot[ind][:, ascendingOrder]
+            if ind in self.time:
+                self.time[ind] = self.time[ind][ascendingOrder]
+
 
 
     def createApproxGkl(self, k, l):
