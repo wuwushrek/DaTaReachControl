@@ -85,7 +85,7 @@ for i in range(uSeq.shape[1]):
         return np.array([[Interval(uSeq[j,i])] for j in range(uSeq.shape[0])])
     def temp_u_der (t):
         return np.array([[Interval(0)] for j in range(uSeq.shape[0])])
-    tVal1, xVal = overApproxTube(x0, t0, 41, 0.01, fover, gover, temp_u,
+    tVal1, xVal = DaTaReach(x0, t0, 41, 0.01, fover, gover, temp_u,
                                     temp_u_der, useFast=True)
     if res_t1 is None:
         res_t1 = tVal1[:-1]
@@ -94,7 +94,7 @@ for i in range(uSeq.shape[1]):
         res_t1 = np.concatenate((res_t1, tVal1[:-1]))
         res_x = np.concatenate((res_x, xVal[:,:-1]),axis=1)
 
-    tVal2, xVal_t = overApproxTube(x0, t0, 41, 0.01, fover, gover, temp_u,
+    tVal2, xVal_t = DaTaReach(x0, t0, 41, 0.01, fover, gover, temp_u,
                                     temp_u_der, useFast=False)
     if res_t2 is None:
         res_t2 = tVal2[:-1]
@@ -105,9 +105,9 @@ for i in range(uSeq.shape[1]):
 
 # Compute both tight over-approximation and loose over-approx
 x0 = np.array([[Interval(xFinal[j])] for j in range(xFinal.shape[0])])
-t1, xOver = overApproxTube(x0, tend, 201, 0.01, fover, gover, u_over,
+t1, xOver = DaTaReach(x0, tend, 201, 0.01, fover, gover, u_over,
                                     u_der, useFast=True)
-t2, xOver_t = overApproxTube(x0, tend, 201, 0.01, fover, gover, u_over,
+t2, xOver_t = DaTaReach(x0, tend, 201, 0.01, fover, gover, u_over,
                                     u_der, useFast=False)
 res_t1 = np.concatenate((res_t1, t1))
 res_x = np.concatenate((res_x, xOver),axis=1)

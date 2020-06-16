@@ -56,7 +56,7 @@ def fixpointRecursive(x,  dt, uOver, fOver, GOver,
     return r
 
 
-def fixpointGronwall(x, dtCoeff, uOver, fOver, GOver):
+def fixpointGronwall(x, dtCoeff, uOver, fOver, GOver, vectField=None):
     """Compute an a priori enclosure, i.e. a loose over-approximation of
     the state for all time between t and  t+dt, that ensures the existence
     of a solution to the unknown dynamical system. This is done using the
@@ -65,7 +65,7 @@ def fixpointGronwall(x, dtCoeff, uOver, fOver, GOver):
     Parameters
     ----------
     :param x : A box containing the current state
-    :param dt : The sampling time or integration step
+    :param dtCoeff : The gronwall coefficient for finding apriori enclosure
     :param uOver : A box giving a range of the control
     :param fOver : Over-approximation of the unknown function f
     :param GOver : over-approximation of the unknown function G
@@ -75,11 +75,14 @@ def fixpointGronwall(x, dtCoeff, uOver, fOver, GOver):
     An interval representing the a priori enclosure S_(x(x+dt)) in the paper
     """
     # (1.0/(1-np.sqrt(x.shape[0])*dt*beta_dt))*dt
-    hValAbs =  np.abs(fOver(x) + np.matmul(GOver(x), uOver))
+    if vectField is None:
+        hValAbs =  np.abs(fOver(x) + np.matmul(GOver(x), uOver))
+    else:
+        hValAbs =  np.abs(vectField)
     maxVal = np.max([hValAbs[i,0].ub for i in range(hValAbs.shape[0])])
     return x + dtCoeff * maxVal * np.full(x.shape, Interval(-1,1))
 
-def overApproxTube(x0, t0, nPoint, dt, fOver, GOver, uOver, uDer, useFast=False):
+def DaTaReach(x0, t0, nPoint, dt, fOver, GOver, uOver, uDer, useFast=False):
     """ Compute an over-approximation of the reachable set at time
         t0, t0+dt...,t0 + nPoint*dt.
 

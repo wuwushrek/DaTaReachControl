@@ -60,9 +60,9 @@ def test_OverApprox():
             return np.array([[Interval(uSeq[j,i])] for j in range(uSeq.shape[0])])
         def uDer (intT):
             return np.array([[Interval(0)] for j in range(uSeq.shape[0])])
-        listT1, overX = overApproxTube(currXInt, 0, nPoint, dt/nPoint, fover,
+        listT1, overX = DaTaReach(currXInt, 0, nPoint, dt/nPoint, fover,
                             gover, uOver, uDer, useFast=False)
-        listT1, overXf = overApproxTube(currXInt, 0, nPoint, dt/nPoint, fover,
+        listT1, overXf = DaTaReach(currXInt, 0, nPoint, dt/nPoint, fover,
                             gover, uOver, uDer, useFast=True)
         trueX , trueXdot, _ = generateTraj(fFun, GFun, currX, \
                                             uSeq[:,i:(i+1)], dt, nPoint)
