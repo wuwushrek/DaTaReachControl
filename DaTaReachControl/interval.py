@@ -140,6 +140,26 @@ class Interval:
     def conjugate(self):
         return self
 
+    def cos(self):
+        if np.abs(self.lb-self.ub) < Interval.epsTol:
+            return Interval(np.cos(self.lb))
+        scalMin = self.lb % (2*np.pi) if self.lb >= 0 \
+                    else self.lb + np.ceil(-self.lb / (2*np.pi)) * (2*np.pi)
+        scalMax = self.ub % (2*np.pi) if self.ub >= 0 \
+                    else self.ub + np.ceil(-self.ub / (2*np.pi)) * (2*np.pi)
+        cos1 = np.cos(scalMin)
+        cos2 = np.cos(scalMax)
+        if scalMin >= scalMax:
+            return Interval(np.minimum(cos1,cos2), 1)
+        elif scalMin < np.pi and np.pi < scalMax:
+            return Interval(-1, np.maximum(cos1,cos2))
+        else:
+            return Interval(np.minimum(cos1,cos2), np.maximum(cos1,cos2))
+
+    def sin(self):
+        return self.__sub__(np.pi/2).cos()
+
+
     def contains(self, val):
         if isinstance(val, int) or isinstance(val, float):
             return self.lb-val <= Interval.epsTol and \
