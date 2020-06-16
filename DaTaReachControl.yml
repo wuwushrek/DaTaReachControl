@@ -9,7 +9,7 @@ dependencies:
   - attrs=19.3.0=py_0
   - blas=1.0=mkl
   - ca-certificates=2020.1.1=0
-  - certifi=2019.11.28=py37_0
+  - certifi=2020.4.5.1=py37_0
   - coverage=5.0=py37h7b6447c_0
   - cycler=0.10.0=py37_0
   - dbus=1.13.12=h746ee38_0
@@ -19,7 +19,7 @@ dependencies:
   - glib=2.63.1=h5a9c865_0
   - gst-plugins-base=1.14.0=hbbd80ab_1
   - gstreamer=1.14.0=hb453b48_1
-  - gurobi=8.1.1=py37_0
+  - gurobi=9.0.2=py37_0
   - icu=58.2=h9c2bf20_1
   - importlib_metadata=1.5.0=py37_0
   - intel-openmp=2020.0=166
@@ -46,7 +46,7 @@ dependencies:
   - ncurses=6.1=he6710b0_1
   - numpy=1.18.1=py37h4f9e942_0
   - numpy-base=1.18.1=py37hde5b4d6_1
-  - openssl=1.1.1d=h7b6447c_4
+  - openssl=1.1.1g=h7b6447c_0
   - packaging=20.1=py_0
   - pcre=8.43=he6710b0_0
   - pip=20.0.2=py37_1
