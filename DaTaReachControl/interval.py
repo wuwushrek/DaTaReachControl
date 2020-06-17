@@ -53,7 +53,7 @@ class Interval:
         self._ub = value
 
     def __repr__(self):
-        return '[{lb:.3f} , {ub:.3f}]'.format(lb=self.lb, ub=self.ub)
+        return '[{lb:.7f} , {ub:.7f}]'.format(lb=self.lb, ub=self.ub)
 
     def __add__(self, other):
         if isinstance(other, int) or isinstance(other, float):

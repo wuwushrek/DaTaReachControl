@@ -76,12 +76,12 @@ class FOverApprox:
         if time is not None:
             self.time = np.concatenate((self.time,np.array([time])))
 
-    def removeData(self, currX, finalSize=10):
+    def removeData(self, currX, finalSize=10, thresholdSize=15):
         """Remove data that are "the farthest away" from currX. Specifically,
         we keep only 'finalSize' number of points that are the closest to currX.
         """
         # Do not remove anything if the data set is less that the desired size
-        if self.E0x is None or self.E0x.shape[1] < finalSize:
+        if self.E0x is None or self.E0x.shape[1] < thresholdSize:
             return
         # Find the data points with the less distance to the current point
         distValues = np.linalg.norm(self.E0x, axis=0)
@@ -101,7 +101,8 @@ class FOverApprox:
         if k in self.knownFun:
             return self.knownFun[k][-1]
         def fkOver(x):
-            assert self.E0x.shape[1] >= 1, "No data to estimate f[{}]".format(k)
+            assert self.E0x is not None and self.E0x.shape[1] >= 1, \
+                                    "No data to estimate f[{}]".format(k)
             # Compute the distance of x to every point in the data
             # print(np.repeat(x[self.vDep[k],:], self.E0x.shape[1],axis=1)- self.E0x[self.vDep[k],:])
             norm_v = np.linalg.norm(
@@ -158,6 +159,9 @@ class FOverApprox:
         for i in range(resVal.shape[0]):
             resVal[i,0] = self.fOver[i](x)
         return resVal
+
+    def canApproximate(self, minSize =1):
+        return self.E0x is not None and self.E0x.shape[1] >= minSize
 
 class GOverApprox:
     """Compute an over-approximation of the unknown function G
@@ -278,13 +282,13 @@ class GOverApprox:
             self.time[nZInd] = np.concatenate((self.time[nZInd],np.array([time])))
 
 
-    def removeData(self, currX, finalSize=10):
+    def removeData(self, currX, finalSize=10, thresholdSize=15):
         """Remove data that are "the farthest away" from currX. Specifically,
         we keep only 'finalSize' number of points that are the closest to currX.
         """
         # Do not remove anything if the data set is less that the desired size
         for ind, (xVal, xDotVal, uVal) in self.Ej.items():
-            if  xVal.shape[1] < finalSize:
+            if  xVal.shape[1] < thresholdSize:
                 continue
             # Find the data points with the less distance to the current point
             distValues = np.linalg.norm(xVal, axis=0)
@@ -297,7 +301,6 @@ class GOverApprox:
             self.xDot[ind] = self.xDot[ind][:, ascendingOrder]
             if ind in self.time:
                 self.time[ind] = self.time[ind][ascendingOrder]
-
 
 
     def createApproxGkl(self, k, l):
@@ -336,3 +339,11 @@ class GOverApprox:
             for l in range(resVal.shape[1]):
                 resVal[k,l] = self.GOver[(k,l)](x)
         return resVal
+
+    def canApproximate(self, minSize = 1):
+        for j in range(self.LG.shape[1]):
+            if j not in self.Ej:
+                return False
+            elif self.Ej[j][0].shape[1] < minSize:
+                return False
+        return True
