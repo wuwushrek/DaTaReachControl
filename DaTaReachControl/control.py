@@ -217,10 +217,16 @@ class DaTaControl:
         # Save if gronwall needs to be used or not
         self.gronwall = gronwall
 
-        # Save the
+        # Save the verbose parameters
         self.optVerb = optVerb
         self.solverVerb = solverVerb
         self.solopts = solopts
+
+        # Save the parameters for optimization
+        self.dictU = None
+        self.dictConstr = None
+        self.listCost = None
+        self.mOpt = None
 
         # Update the threshold for updating over-approx
         self.threshUpdateApprox = threshUpdateApprox
@@ -267,6 +273,13 @@ class DaTaControl:
         Create the optimizations problems that are going to be used for
         the synthesis of a controller
         """
+        if self.mOpt is not None:
+            listCost = list()
+            for nbProblem, (u, x_var, d) in self.dictU.items():
+                listCost.append(costFun(x_var, u))
+            self.listCost = listCost
+            self.mOpt.setObjective(gp.quicksum(self.listCost))
+            return
         self.dictU, self.dictConstr, self.listCost, self.mOpt = \
             gurobiControlProblem(np.full((self.nState,1),Interval(0)),
                 np.full((self.nState,self.nControl),Interval(0)),
