@@ -159,6 +159,9 @@ class Interval:
     def sin(self):
         return self.__sub__(np.pi/2).cos()
 
+    def tan(self):
+        return self.sin().__truediv__(self.cos())
+
 
     def contains(self, val):
         if isinstance(val, int) or isinstance(val, float):
