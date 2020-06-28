@@ -31,8 +31,8 @@ time_meas = np.array([ i*deltaT for i in range(xTraj.shape[1])])
 traj = {'x' : xTraj, 'xDot' : xDotTraj, 'u' : uSeq}
 
 #Over-approximations functions
-knownFunF = {0 : {-1 : lambda x : Interval(0),
-                   0 : lambda x : Interval(0)}}
+knownFunF = {0 : {-1 : lambda x : 0,
+                   0 : lambda x : 0}}
 fover = FOverApprox(lipF, traj=traj, knownFun=knownFunF)
 gover = GOverApprox(lipG, fover, traj=traj)
 
@@ -55,7 +55,8 @@ xG = -1.0
 next_state_aux = synthNextState(f, G, dt, atol=1e-10, rtol=1e-10)
 
 def costFun(x, u):
-    return cp.sum_squares(x-xG)
+    return (x[0]-xG)*(x[0]-xG)
+
 # Stopping criteria
 def stopCriteria(x):
     # print (np.abs(x[0]- xG))
@@ -64,9 +65,8 @@ def stopCriteria(x):
 maxIter=1000
 
 synth_control = DaTaControl(costFun, uRange, lipF, lipG, traj, knownFunF=knownFunF,
-                    optVerb=False, solverVerb=True, solver=cp.GUROBI, solopts={},
-                    probLearning=[0.1, 0.9], threshUpdateApprox=0.1,
-                    thresMeanTraj=1e-3, coeffLearning=0.1,
+                    optVerb=False, solverVerb=True, probLearning=[0.1, 0.9],
+                    threshUpdateApprox=0.1, thresMeanTraj=1e-3, coeffLearning=0.1,
                     minDataF=15 , maxDataF=25, minDataG=5, maxDataG=10, dt=dt)
 
 currX = np.copy(xFinal).reshape(-1,1)
