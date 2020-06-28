@@ -4,7 +4,7 @@ from DaTaReachControl import GOverApprox
 from DaTaReachControl import Interval
 
 # File variable that is used for hyperparameter
-_fixpointWidenCoeff = 0.1
+_fixpointWidenCoeff = 0.2
 # Detect interval with a small diameter
 _zeroDiameter = 1e-5
 # coefficient to widen interval with small diameter and close to 0
@@ -130,9 +130,4 @@ def DaTaReach(x0, t0, nPoint, dt, fOver, GOver, uOver, uDer, useFast=False):
                     np.tensordot(GOver.JG(lastX), Ur, axes=([1,0]))[:,:,0]),fr) \
                 + np.matmul(GEncl, uDer(Interval(integTime[i-1],integTime[i])))
         stateTime[:,i:(i+1)] = stateTime[:,(i-1):i] + fx * dt + sTerm * (0.5*dt**2)
-        # print(integTime[i])
-        # print(rEncl)
-        # print(Ut, Ur)
-        # print(stateTime[:,i])
-        # print('----------------')
     return integTime, stateTime
