@@ -3,13 +3,14 @@ from numpy import float64 as realN
 
 from overapprox_functionsN import *
 from intervalN import *
-from interval import Interval, and_numpy_int
+from interval import and_numpy_int
 from numba import jit, typeof, typed
 # from numba import float64 as real
 # from numba import int64 as indType
 
 from reachN import *
-from DaTaReachControl import generateTraj, synthNextState, synthTraj
+from reach import *
+from DaTaReachControl import generateTraj, synthNextState, synthTraj, FOverApprox, GOverApprox,Interval
 
 import time
 
@@ -50,18 +51,15 @@ def i2n(intVal):
                     res_lb[i,j,k], res_ub[i,j,k] = intVal[i,j,k].lb, intVal[i,j,k].ub
     return res_lb, res_ub
 
-xdot_i = 1.0
-fx_i_lb = -0.5
-fx_i_ub = 0.05
-Gx_i_lb = np.array([0.9,-0.1])
-Gx_i_ub = np.array([1.1,0.1])
-u = np.array([1.0,0])
-nf_lb, nf_ub = hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u)
-startT = time.time()
-nf_lb, nf_ub = hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u)
-print(time.time()-startT)
-print (nf_lb, nf_ub)
-print (Gx_i_lb, Gx_i_ub)
+def gen_int(shape=None, minVal=-10, widthMax=10):
+    if shape is None:
+        lb = widthMax * np.random.random() + minVal
+        ub = lb + widthMax * np.random.random()
+        return Interval(float(lb), float(ub))
+    else:
+        lb = widthMax * np.random.random(shape) + minVal
+        ub = lb + widthMax * np.random.random(shape)
+        return n2i(lb,ub)
 
 ###############################################################################
 ###############################################################################
@@ -130,7 +128,7 @@ def one_step_dyn(current_state, current_input):
 initial_state = np.array([-2, -2.5, np.pi/2])
 
 # Number of data in initial trajectory
-n_data_max = 10
+n_data_max = 20
 
 # max number of iteration
 max_iteration = 70 - n_data_max
@@ -146,17 +144,19 @@ input_ub = np.array([v_max, w_max])
 # Generate input sequence
 v_seq = -1 *(np.random.rand(n_data_max,1) - 0) * v_max       # Go only backwards
 w_seq = 2 * (np.random.rand(n_data_max,1) - 0.5) * w_max
+nSep = int(n_data_max /2)
+sepIndexes = np.random.choice([ i for i in range(n_data_max)], nSep, replace=False)
 # The trajectory should try system response in each control direction
 w_seq[0,0] = 0.0 #
 v_seq[0,0] = 0.0
-for i in range(1,v_seq.shape[0]):
+for i in range(1,nSep):
   v_or_theta = np.random.randint(0,2)
   if v_or_theta == 0: # pick v
-    w_seq[i,0] = 0
+    w_seq[sepIndexes[i],0] = 0
   else: # pick theta
-    v_seq[i,0] = 0
+    v_seq[sepIndexes[i],0] = 0
 rand_init_input_vec = np.hstack((v_seq,w_seq))
-# print (rand_init_input_vec)
+print (rand_init_input_vec)
 ###################################################################
 
 # Generate the random trajectory corresponding to random input sequence
@@ -179,6 +179,7 @@ context_u_lb = np.hstack((np.array([xlim_tup[0], ylim_tup[0], -1, -1]), input_lb
 context_u_ub = np.hstack((np.array([xlim_tup[1], ylim_tup[1], 1, 1]), input_ub))
 
 
+########################################################################
 Lf = np.array([0, 0, 0], dtype=realN)
 LG = np.array([[1,0],[1,0],[0,0]], dtype=realN)
 bG = Dict(*depTypebG)
@@ -189,72 +190,135 @@ nDepG = Dict(*depTypeG)
 nDepG[(0,0)] = np.array([0,1],dtype=np.int64)
 nDepG[(1,0)] = np.array([0,1],dtype=np.int64)
 
-res = ReachDyn(Lf, LG,  Lfknown=None, LGknown=None, nvDepF=depTypeF,
+@jit(nopython=True)
+def knownGfun(x_lb, x_ub):
+    res_lb = np.zeros((3,2),dtype=realN)
+    res_ub = np.zeros((3,2),dtype=realN)
+    res_lb[2,1] = 1
+    res_ub[2,1] = 1
+    # res_lb[0,0], res_ub[0,0] = cos_i(x_lb[2], x_ub[2])
+    return res_lb, res_ub
+
+overApprox = initOverApprox(Lf, LG,  Lfknown=None, LGknown=None, nvDepF=depTypeF,
         nvDepG=nDepG, bf=depTypebf , bG =bG , bGf = depTypeGradF,
         bGG=depTypeGradG, xTraj=rand_init_traj_vec.T,
         xDotTraj=rand_init_traj_der_vec.T, uTraj=rand_init_input_vec.T,
-        useGronwall=False, verbose=True)
+        useGronwall=True, verbose=False, Gknown=knownGfun)
+########################################################################
 
-print (depTypeG)
-print(nDepG)
-print (res.vDepG)
-# lipF = np.array([1.2])
-# lipG = np.array([[0.7]])
-# res = ReachDyn(lipF, lipG, verbose=True)
-# print (depTypeG)
+########################################################################
+bGx = {}
+bGx[(0,0)] = Interval(-1.0,1.0)
+bGx[(1,0)] = Interval(-1.0,1.0)
+nDepGx = {}
+nDepGx[(0,0)] = np.array([0,1],dtype=np.int64)
+nDepGx[(1,0)] = np.array([0,1],dtype=np.int64)
+knownG = {(2,1) : {-1 : lambda x : 1,
+                    0 : lambda x : 0,
+                    1 : lambda x : 0,
+                    2 : lambda x : 0}}
+fOverO = FOverApprox(Lf.reshape(-1,1), traj={'x' : rand_init_traj_vec.T,
+                                    'xDot' : rand_init_traj_der_vec.T,
+                                    'u' : rand_init_input_vec.T},
+                    nDep={}, bf={}, bGf={}, knownFun={},
+                    Lknown=None, learnLip=False, verbose=True)
+GoverO = GOverApprox(LG, fOverO, traj={'x' : rand_init_traj_vec.T,
+                                    'xDot' : rand_init_traj_der_vec.T,
+                                    'u' : rand_init_input_vec.T},
+                    nDep=nDepGx, bG=bGx, bGG={}, knownFun=knownG,
+                    Lknown=None, learnLip=False, verbose=False)
+########################################################################
 
-# depTypeF = Dict.empty(key_type=indType, value_type=indType[:])
-# depTypeF[0] = np.array([0,1], dtype=np.int64)
-# typeof(depTypeF)
-# for i, value in depTypeF.items():
-#     print(typeof(i), typeof(value))
+########################################################################
+@jit(nopython=True)
+def test_n(x, randve):
+    for i in range(randve.shape[1]):
+        Gover(x, randve[:,i], randve[:,i], knownGfun)
 
-# @jit(types.void(typeof(depTypeF)), nopython=True)
-# def test(val):
-#     Jf = np.empty((3,3), dtype=real)
-#     Jf[0, :][np.array([0,1])] = 1
-#     for i, value in val.items():
-#         print(i, value)
-#         # print (typeof(i), typeof(value))
+# @jit(nopython=True)
+def test_o(x, randve):
+    for i in range(randve.shape[1]):
+        x(np.array([[randve[j,i]] for j in range(randve.shape[0])]))
 
-# # @jit(types.void(types.void(typeof(depTypeF),)), nopython=True)
-# # def test_bis(val):
-# #     d = dict()
-# #     d[0] = np.array([0,1], dtype=np.int64)
-# #     val(d)
+def test_inclusion(numb, old, randve):
+    for i in range(randve.shape[1]):
+        val = Gover(numb, randve[:,i], randve[:,i], knownGfun)
+        convVal = n2i(*val)
+        val2 = old(np.array([[randve[j,i]] for j in range(randve.shape[0])]))
+        for k in range(val2.shape[0]):
+            for l in range(val2.shape[1]):
+                # print(val2[k,l], convVal[k,l])
+                assert val2[k,l].contains(convVal[k,l])
 
-# # test_bis(test)
 
-# spec = [('x', real)]
-# @jitclass(spec)
-# class Test:
-#     def __init__(self, x):
-#         self.x = x
-#     def init_fun(self, f):
-#         return f(self.x)
+x_min = np.min(rand_init_traj_vec.T, axis=1)
+x_max = np.max(rand_init_traj_vec.T, axis=1)
+res_x = np.zeros((x_min.shape[0], 20))
+for i in range(res_x.shape[1]):
+    res_x[:,i] = ((x_max - x_min) * np.random.random() + x_min)[:]
+    # print(typeof(res_x[:,i]))
 
-# @jit(real(real), nopython=True)
-# def fTest(x):
-#     return x*2
+test_inclusion(overApprox, GoverO, res_x)
+test_n(overApprox, res_x)
 
-# t = Test(5.0)
-# print(t.init_fun(fTest))
-# # x= np.random.random(10)
-# t = Test(x)
-# print(x)
-# print(t.f(np.zeros(x.shape[0])))
-# @jit(real(real), nopython=True)
-# def test(x):
-#     return x
+s = time.time()
+test_n(overApprox, res_x)
+print('Numba : ', time.time()-s)
 
-# @jit(nopython=True, parallel=True)
-# def test_dict(x):
-#     for key, val in x.items():
-#         print (key,val)
+s = time.time()
+test_o(GoverO, res_x)
+print('Default : ', time.time()-s)
 
-# from numba.typed import Dict
-# d = Dict()
-# d[0] = 1
-# d[1] = 2
-# d[3] = 3
-# test_dict(d)
+uVal = gen_int(2, minVal=-0.2, widthMax=0.4)
+uN = i2n(uVal)
+uVal = uVal.reshape(-1,1)
+
+print(uVal)
+dtCoeff = getCoeffGronwall(overApprox, sampling_time, *uN)
+
+r_lb, r_ub = fixpoint(overApprox, res_x[:,0], res_x[:,0], sampling_time, *uN,
+             knownf=None, knownG=knownGfun, hOver=None)
+
+r_old = fixpointRecursive(np.array([[res_x[j,0]] for j in range(res_x.shape[0])]),
+                sampling_time, uVal, fOverO, GoverO)
+
+r_2 = fixpointGronwall(np.array([[res_x[j,0]] for j in range(res_x.shape[0])]),
+                            dtCoeff, uVal, fOverO, GoverO)
+print (n2i(r_lb,r_ub))
+print(r_old)
+print(r_2)
+########################################################################
+
+############ Test and plot differential inclusion ######################
+c_vmax = 0.25 * v_max
+c_wmax = 0.25 * w_max
+c_rot = 2.0
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def uOver(t_lb, t_ub):
+    x_lb = np.empty(2, dtype=realN)
+    x_ub = np.empty(2, dtype=realN)
+    x_lb[0] = c_vmax
+    x_ub[0] = c_vmax
+    x_lb[1], x_ub[1] = sin_i(c_rot*t_lb, c_rot*t_ub)
+    x_lb[1] *= c_wmax
+    x_ub[1] *= c_wmax
+    return x_lb, x_ub
+
+def uOverO(intT):
+    x_lb, x_lb = uOver(intT.lb, intT.ub)
+    return n2i(x_lb, x_ub).reshape(-1,1)
+
+@njit(nopython=True, parallel=False, fastmath=True)
+def uOver_der(t_lb, t_ub):
+    x_lb = np.zeros(2, dtype=realN)
+    x_ub = np.zeros(2, dtype=realN)
+    x_lb[1], x_ub[1] = cos_i(c_rot*t_lb, c_rot*t_ub)
+    x_lb[1] *= c_wmax * c_rot
+    x_ub[1] *= c_wmax * c_rot
+    return x_lb, x_ub
+
+def uOver_derO(intT):
+    x_lb, x_lb = uOver(intT.lb, intT.ub)
+
+########################################################################
