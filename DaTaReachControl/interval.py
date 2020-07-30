@@ -228,3 +228,9 @@ class Interval:
         if isinstance(other, Interval):
             return self.lb - other.ub >= -Interval.epsTol
         assert False, 'Not the same object {}'.format(type(other))
+
+def and_numpy_int(val):
+    finalVal = val[0]
+    for i in range(1, val.shape[0]):
+        finalVal = finalVal & val[i]
+    return finalVal

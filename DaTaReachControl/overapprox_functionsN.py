@@ -18,8 +18,7 @@ depTypeGradF = Dict.empty(key_type=types.UniTuple(indType,2),
 depTypeGradG = Dict.empty(key_type=types.UniTuple(indType,3),
                           value_type=types.UniTuple(real,2))
 
-@jit([types.UniTuple(real,2)(real, real, real, real[:], real[:], real[:])],
-    nopython=True, parallel=False, fastmath=True)
+@jit(nopython=True, parallel=False, fastmath=True)
 def hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u):
     """ Given an equation constraint of the type
         xdot_i = fx_i + sum_k (Gx_i)_k u_k where fx_i, (Gx_i)_k are unknown for
@@ -80,8 +79,7 @@ def hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u):
     return nGu_lb[-1], nGu_ub[-1]
 
 
-@jit(types.UniTuple(real,2)(real[:], real[:], real, indType[:], real[:,:],real[:], real[:]),\
-     nopython=True, parallel=True, fastmath=True)
+@jit(nopython=True, parallel=False, fastmath=True)
 def lipOverApprox(x_lb, x_ub, L, varDep, dataState, dataFun_lb, dataFun_ub):
     """ Function to over-approximate a real-valued function at the given
         input x based on the Lipschitz constants of the function, and
@@ -101,7 +99,7 @@ def lipOverApprox(x_lb, x_ub, L, varDep, dataState, dataFun_lb, dataFun_ub):
         -------
         An overapproximation of the unknown function at given x
     """
-    if L == 0:
+    if L <= epsTolInt:
         return dataFun_lb[-1], dataFun_ub[-1]
     normValLip_lb = np.empty(dataState.shape[1], dtype=realN)
     normValLip_ub = np.empty(dataState.shape[1], dtype=realN)
@@ -112,8 +110,7 @@ def lipOverApprox(x_lb, x_ub, L, varDep, dataState, dataFun_lb, dataFun_ub):
     res_lb, res_ub = and_iv(*add_i(dataFun_lb, dataFun_ub, normValLip_lb, normValLip_ub))
     return res_lb, res_ub
 
-@jit([types.UniTuple(real[:,:],2)(real[:], typeof(depTypeF), typeof(depTypeGradF))],
-    nopython=True, parallel=True, fastmath=True)
+@jit(nopython=True, parallel=False, fastmath=True)
 def buildJacF(LipF, nDep, gradBounds):
     """ Compute the enclosure of the Jacobian matrice Jf based only on the
         LIpschitz constant LipF, the non-dependent variables of f, and
@@ -136,8 +133,7 @@ def buildJacF(LipF, nDep, gradBounds):
                                                  Jf_init_ub[i,j], lb, ub)
     return Jf_init_lb, Jf_init_ub
 
-@jit([types.UniTuple(real[:,:,:],2)(real[:,:], typeof(depTypeG), typeof(depTypeGradG))],
-    nopython=True, parallel=True, fastmath=True)
+@jit(nopython=True, parallel=False, fastmath=True)
 def buildJacG(LipG, nDep, gradBounds):
     """ Compute the enclosure of the Jacobian matrice JG based only on the
         LIpschitz constant LipG, the non-dependent variables of G, and
@@ -162,30 +158,20 @@ def buildJacG(LipG, nDep, gradBounds):
     return JG_init_lb, JG_init_ub
 
 
-@jit([types.UniTuple(real[:,:],2)(real[:,:], real[:,:], types.misc.Omitted(None)),
-      types.UniTuple(real[:,:],2)(real[:,:], real[:,:], real[:,:]),
-      types.UniTuple(real[:,:,:],2)(real[:,:,:], real[:,:,:], types.misc.Omitted(None)),
-      types.UniTuple(real[:,:,:],2)(real[:,:,:], real[:,:,:], real[:,:,:])],
-    nopython=True, parallel=False, fastmath=True)
-def updateJac(encJac_lb, encJac_ub, knownJacx=None):
-    """ Given Assuming the unknown function f = f_known + f_unknown,
-    encJac = (encJac_lb,encJac_ub) provides an over-approximation of the
-    Jacobian of f_unknown while knownJac provides the exact Jacobian of
-    f_known. The resulting Jacobian of f is the adddition of the two
-    """
-    if knownJacx is None:
-        return encJac_lb, encJac_ub
-    # Compute the known jac
-    return encJac_lb+knownJacx, encJac_ub+knownJacx
+# @jit(nopython=True, parallel=False, fastmath=True)
+# def updateJac(encJac_lb, encJac_ub, knownJacx=None):
+#     """ Given Assuming the unknown function f = f_known + f_unknown,
+#     encJac = (encJac_lb,encJac_ub) provides an over-approximation of the
+#     Jacobian of f_unknown while knownJac provides the exact Jacobian of
+#     f_known. The resulting Jacobian of f is the adddition of the two
+#     """
+#     if knownJacx is None:
+#         return encJac_lb, encJac_ub
+#     # Compute the known jac
+#     return encJac_lb+knownJacx, encJac_ub+knownJacx
 
-@jit([types.UniTuple(real[:],2)(real[:], real[:], real[:], typeof(depTypeF),
-                     real[:,:], real[:,:], real[:,:], types.misc.Omitted(None),
-                     types.misc.Omitted(None)),
-      types.UniTuple(real[:],2)(real[:], real[:], real[:], typeof(depTypeF),
-                     real[:,:], real[:,:], real[:,:], real[:], real[:])],
-    nopython=True, parallel=True, fastmath=True)
-def foverapprox(x_lb, x_ub, LipF, varDep, dataState, dataFun_lb, dataFun_ub,
-                knownFx_lb=None, knownFx_ub=None):
+@jit(nopython=True, parallel=False, fastmath=True, nogil=True)
+def foverapprox(x_lb, x_ub, LipF, varDep, dataState, dataFun_lb, dataFun_ub):
     """Compute the over-approximation of f at the given interval x=(x_lb, x_ub)
        given a trajectory x_traj = dataState and dataFun=(dataFun_lb, dataFun_ub)
        over-approximate f at each point x inside dataState
@@ -195,19 +181,10 @@ def foverapprox(x_lb, x_ub, LipF, varDep, dataState, dataFun_lb, dataFun_ub,
     for k in prange(x_lb.shape[0]):
         res_lb[k], res_ub[k] = lipOverApprox(x_lb, x_ub, LipF[k], varDep[k],
                                 dataState, dataFun_lb[k,:], dataFun_ub[k,:])
-    if knownFx_lb is None or knownFx_ub is None:
-        return res_lb, res_ub
-    else:
-        return  res_lb+knownFx_lb, res_ub+knownFx_ub
+    return res_lb, res_ub
 
-@jit([types.UniTuple(real[:,:],2)(real[:], real[:], real[:,:], typeof(depTypeG),
-                     real[:,:], real[:,:,:], real[:,:,:], types.misc.Omitted(None),
-                     types.misc.Omitted(None)),
-      types.UniTuple(real[:,:],2)(real[:], real[:], real[:,:], typeof(depTypeG),
-                     real[:,:], real[:,:,:], real[:,:,:], real[:,:], real[:,:])],
-    nopython=True, parallel=True, fastmath=True)
-def Goverapprox(x_lb, x_ub, LipG, varDep, dataState, dataFun_lb, dataFun_ub,
-                knownGx_lb=None, knownGx_ub=None):
+@jit(nopython=True, parallel=False, fastmath=True, nogil=True)
+def Goverapprox(x_lb, x_ub, LipG, varDep, dataState, dataFun_lb, dataFun_ub):
     """Compute the over-approximation of G at the given interval x=(x_lb, x_ub)
        given a trajectory x_traj = dataState and dataFun=(dataFun_lb, dataFun_ub)
        over-approximate G at each point x inside dataState
@@ -219,13 +196,9 @@ def Goverapprox(x_lb, x_ub, LipG, varDep, dataState, dataFun_lb, dataFun_ub,
             res_lb[k,l], res_ub[k,l] = lipOverApprox(x_lb, x_ub, LipG[k,l],
                                         varDep[(k,l)], dataState,
                                         dataFun_lb[k,l,:], dataFun_ub[k,l,:])
-    if knownGx_lb is None or knownGx_ub is None:
-        return res_lb, res_ub
-    else:
-        return res_lb+knownGx_lb, res_ub+knownGx_ub
+    return res_lb, res_ub
 
-@jit([types.void(real[:], real[:], real[:], real[:], real[:], real[:,:], real[:,:])],
-    nopython=True, parallel=True, fastmath=True)
+@jit(nopython=True, parallel=False, fastmath=True)
 def updateTraj(x, xdot, u, fxR_lb, fxR_ub, GxR_lb, GxR_ub):
     """ Given new data point, update your knowledge of f and G """
     for i in prange(x.shape[0]):
