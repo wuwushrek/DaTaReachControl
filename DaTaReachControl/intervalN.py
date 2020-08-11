@@ -116,6 +116,20 @@ def mul_iMv(x_lb, x_ub, y_lb, y_ub):
     return res_lb, res_ub
 
 @jit(nopython=True, parallel=False, fastmath=True)
+def mul_MM(x_lb, x_ub, y_lb, y_ub):
+    """ Define the Multiplication between two interval matrices
+    """
+    res_lb = np.zeros((x_lb.shape[0], y_ub.shape[1]), dtype=realN)
+    res_ub = np.zeros((x_lb.shape[0], y_ub.shape[1]), dtype=realN)
+    for i in prange(res_lb.shape[0]):
+        for j in prange(res_lb.shape[1]):
+            for k in prange(x_lb.shape[1]):
+                t_lb, t_ub = mul_i(x_lb[i,k], x_ub[i,k], y_lb[k,j], y_ub[k,j])
+                res_lb[i,j] += t_lb
+                res_ub[i,j] += t_ub
+    return res_lb, res_ub
+
+@jit(nopython=True, parallel=False, fastmath=True)
 def mul_Ms_i(x_lb, x_ub, y):
     """ Define the multiplication between an interval Matrix x=(x_lb,x_ub) and
         a scalar vector y
@@ -293,6 +307,18 @@ def and_iv(x_lb, x_ub):
         return lb, lb
     assert diff >= epsTolInt
     return lb, ub
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def and_M(x_lb, x_ub, y_lb, y_ub):
+    """ Intersection element-wise of two interval matrices
+    """
+    res_lb = np.empty(x_lb.shape, dtype=realN)
+    res_ub = np.empty(x_lb.shape, dtype=realN)
+    for i in range(res_lb.shape[0]):
+        for j in range(res_lb.shape[1]):
+            res_lb[i,j], res_ub[i,j] = and_i(x_lb[i,j], x_ub[i,j],
+                                                    y_lb[i,j], y_ub[i,j])
+    return res_lb, res_ub
 
 ########################################################################
 

@@ -49,6 +49,8 @@ spec = [
     ('fOverTraj_ub', real[:,:]),
     ('GOverTraj_lb', real[:,:,:]),
     ('GOverTraj_ub', real[:,:,:]),
+    ('nbData', indType),
+    ('dataCounter', indType),
 
     ('fixpointWidenCoeff', real),
     ('zeroDiameter', real),
@@ -69,7 +71,7 @@ class ReachDyn(object):
         bGf = depTypeGradF, bGG=depTypeGradG, xTraj=None,
         xDotTraj = None, uTraj = None, useGronwall=False, verbose=False,
         fixpointWidenCoeff=0.2, zeroDiameter=1e-5,
-        widenZeroInterval=1e-3):
+        widenZeroInterval=1e-3, maxData=20):
         # Save the number of state and control
         self.nS = Lf.shape[0]
         self.nC = LG.shape[1]
@@ -111,11 +113,13 @@ class ReachDyn(object):
         self.verbose = verbose
 
         # Update the trajectory data
-        self.xTraj = np.empty((self.nS, 0), dtype=realN)
-        self.fOverTraj_lb = np.empty((self.nS, 0), dtype=realN)
-        self.fOverTraj_ub = np.empty((self.nS, 0), dtype=realN)
-        self.GOverTraj_lb = np.empty((self.nS, self.nC,0), dtype=realN)
-        self.GOverTraj_ub = np.empty((self.nS, self.nC,0), dtype=realN)
+        self.nbData = 0
+        self.dataCounter = 0
+        self.xTraj = np.empty((self.nS, maxData), dtype=realN)
+        self.fOverTraj_lb = np.empty((self.nS, maxData), dtype=realN)
+        self.fOverTraj_ub = np.empty((self.nS, maxData), dtype=realN)
+        self.GOverTraj_lb = np.empty((self.nS, self.nC, maxData), dtype=realN)
+        self.GOverTraj_ub = np.empty((self.nS, self.nC, maxData), dtype=realN)
 
         # Coefficient parameter for computing the apriori enclosure
         self.fixpointWidenCoeff = fixpointWidenCoeff
@@ -128,14 +132,15 @@ def initOverApprox(Lf, LG, Lfknown=None, LGknown=None, nvDepF=depTypeF,
         nvDepG=depTypeG, bf=depTypebf , bG =depTypebG , bGf = depTypeGradF,
         bGG=depTypeGradG, xTraj=None, xDotTraj = None, uTraj = None,
         useGronwall=False, verbose=False, fknown=None, Gknown=None,
-        fixpointWidenCoeff=0.2, zeroDiameter=1e-5, widenZeroInterval=1e-3):
+        fixpointWidenCoeff=0.2, zeroDiameter=1e-5,
+        widenZeroInterval=1e-3, maxData=20):
     """ Initialize an object containing all the side information and Trajectory
     needed to compute the overapproximation of f and G
     """
     overApprox = ReachDyn(Lf, LG, Lfknown, LGknown, nvDepF,
                  nvDepG, bf, bG, bGf, bGG, xTraj, xDotTraj, uTraj,
                  useGronwall, verbose, fixpointWidenCoeff, zeroDiameter,
-                 widenZeroInterval)
+                 widenZeroInterval, maxData)
 
     # Update the Lipschitz constant of the Known function
     updateKnownLip(overApprox, Lfknown, LGknown)
@@ -152,7 +157,9 @@ def initOverApprox(Lf, LG, Lfknown=None, LGknown=None, nvDepF=depTypeF,
 
     # If not update the trajectory list based on HC4-Revise
     for i in range(uTraj.shape[1]):
-        update(overApprox, xTraj[:,i][:], xDotTraj[:,i][:],uTraj[:,i][:],
+        # update(overApprox, xTraj[:,i][:], xDotTraj[:,i][:],uTraj[:,i][:],
+        #         fknown, Gknown)
+        update(overApprox, xTraj[:,i], xDotTraj[:,i], uTraj[:,i],
                 fknown, Gknown)
 
     return overApprox
@@ -225,7 +232,7 @@ def fover(overApprox, x_lb, x_ub, knownf=None):
     """ COmpute an over approximation of f over the interval [x_lb, x_ub]
         knownf provides the Known part of the unknown function f
     """
-    if overApprox.fOverTraj_lb.shape[1] == 0:
+    if overApprox.nbData == 0:
         res_lb = np.full(overApprox.nS, -np.inf, dtype=realN)
         res_ub = np.full(overApprox.nS, np.inf, dtype=realN)
         for i in range(overApprox.nS):
@@ -238,8 +245,9 @@ def fover(overApprox, x_lb, x_ub, knownf=None):
             res_ub += fknowx_ub
     else:
         res_lb, res_ub = foverapprox(x_lb, x_ub, overApprox.Lf, overApprox.vDepF,
-                            overApprox.xTraj, overApprox.fOverTraj_lb,
-                            overApprox.fOverTraj_ub)
+                            overApprox.xTraj[:, :overApprox.nbData],
+                            overApprox.fOverTraj_lb[:, :overApprox.nbData],
+                            overApprox.fOverTraj_ub[:, :overApprox.nbData])
         if knownf is not None:
             fknowx_lb, fknowx_ub = knownf(x_lb,x_ub)
             res_lb += fknowx_lb
@@ -253,7 +261,7 @@ def Gover(overApprox, x_lb, x_ub, knownG=None):
     """ COmpute an over approximation of G over the interval [x_lb, x_ub]
         knownf provides the Known part of the unknown function G
     """
-    if overApprox.GOverTraj_lb.shape[2] == 0:
+    if overApprox.nbData == 0:
         res_lb = np.full((overApprox.nS,overApprox.nC), -np.inf, dtype=realN)
         res_ub = np.full((overApprox.nS,overApprox.nC), np.inf, dtype=realN)
         for i in range(overApprox.nS):
@@ -267,8 +275,9 @@ def Gover(overApprox, x_lb, x_ub, knownG=None):
             res_ub += Gknowx_ub
     else:
         res_lb, res_ub = Goverapprox(x_lb, x_ub, overApprox.LG, overApprox.vDepG,
-                            overApprox.xTraj, overApprox.GOverTraj_lb,
-                            overApprox.GOverTraj_ub)
+                            overApprox.xTraj[:, :overApprox.nbData],
+                            overApprox.GOverTraj_lb[:, :, :overApprox.nbData],
+                            overApprox.GOverTraj_ub[:, :, :overApprox.nbData])
         if knownG is not None:
             Gknowx_lb, Gknowx_ub = knownG(x_lb,x_ub)
             res_lb += Gknowx_lb
@@ -298,16 +307,27 @@ def update(overApprox, xVal, xDot, uVal, knownf=None, knownG=None):
     if overApprox.verbose:
         print('foverx-tight : \n', foverx)
         print('Goverx-tight : \n', Goverx)
-    overApprox.xTraj = \
-        np.concatenate((overApprox.xTraj,xVal.reshape(-1,1)),axis=1)
-    overApprox.fOverTraj_lb = np.concatenate((overApprox.fOverTraj_lb,
-                foverx[0].reshape(-1,1)),axis=1)
-    overApprox.fOverTraj_ub = np.concatenate((overApprox.fOverTraj_ub,
-                foverx[1].reshape(-1,1)),axis=1)
-    overApprox.GOverTraj_lb = np.concatenate((overApprox.GOverTraj_lb,
-                Goverx[0].reshape(overApprox.nS,overApprox.nC,1)),axis=2)
-    overApprox.GOverTraj_ub = np.concatenate((overApprox.GOverTraj_ub,
-                Goverx[1].reshape(overApprox.nS,overApprox.nC,1)),axis=2)
+    overApprox.xTraj[:,overApprox.dataCounter] = xVal
+    overApprox.fOverTraj_lb[:, overApprox.dataCounter] = foverx[0]
+    overApprox.fOverTraj_ub[:, overApprox.dataCounter] = foverx[1]
+    overApprox.GOverTraj_lb[:, :, overApprox.dataCounter] =  Goverx[0]
+    overApprox.GOverTraj_ub[:, :, overApprox.dataCounter] =  Goverx[1]
+
+    if overApprox.nbData < overApprox.xTraj.shape[1]:
+        overApprox.nbData += 1
+    overApprox.dataCounter = \
+        (overApprox.dataCounter + 1) % overApprox.xTraj.shape[1]
+
+    # overApprox.xTraj = \
+    #     np.concatenate((overApprox.xTraj,xVal.reshape(-1,1)),axis=1)
+    # overApprox.fOverTraj_lb = np.concatenate((overApprox.fOverTraj_lb,
+    #             foverx[0].reshape(-1,1)),axis=1)
+    # overApprox.fOverTraj_ub = np.concatenate((overApprox.fOverTraj_ub,
+    #             foverx[1].reshape(-1,1)),axis=1)
+    # overApprox.GOverTraj_lb = np.concatenate((overApprox.GOverTraj_lb,
+    #             Goverx[0].reshape(overApprox.nS,overApprox.nC,1)),axis=2)
+    # overApprox.GOverTraj_ub = np.concatenate((overApprox.GOverTraj_ub,
+    #             Goverx[1].reshape(overApprox.nS,overApprox.nC,1)),axis=2)
 
 @jit(nopython=True, parallel=False, fastmath=True)
 def getCoeffGronwall(overApprox, dt, uRange_lb, uRange_ub):
@@ -318,12 +338,14 @@ def getCoeffGronwall(overApprox, dt, uRange_lb, uRange_ub):
     vecL = overApprox.Lf + overApprox.Lfknown + \
             np.dot(overApprox.LG+overApprox.LGknown, abs_u)
     betaVal = np.sqrt(np.dot(vecL, vecL))
-    return dt / (1-np.sqrt(overApprox.nS)*dt*betaVal)
+    tempVal = np.sqrt(overApprox.nS)*dt*betaVal
+    assert tempVal < 1
+    return dt / (1-tempVal)
 
 
 @jit(nopython=True, parallel=False, fastmath=True)
 def fixpoint(overApprox, x_lb, x_ub, dt, uOver_lb, uOver_ub,
-             knownf, knownG, hOver=None):
+             knownf, knownG, hOver=None, betaValCoeff=-1):
     """ Compute an a priori enclosure, i.e. a loose over-approximation of
         the state for all time between t and  t+dt, that ensures the existence
         of a solution to the unknown dynamical system. The fixpoint
@@ -339,7 +361,10 @@ def fixpoint(overApprox, x_lb, x_ub, dt, uOver_lb, uOver_ub,
         hVal = hOver
 
     if overApprox.useGronwall:
-        betaVal = getCoeffGronwall(overApprox, dt, uOver_lb, uOver_ub)
+        if betaValCoeff <= 0:
+            betaVal = getCoeffGronwall(overApprox, dt, uOver_lb, uOver_ub)
+        else:
+            betaVal = betaValCoeff
         hValAbs = abs_i(*hVal)
         maxVal = np.max(hValAbs) * betaVal
         r_lb, r_ub = x_lb - maxVal, x_ub + maxVal
@@ -372,6 +397,107 @@ def fixpoint(overApprox, x_lb, x_ub, dt, uOver_lb, uOver_ub,
             r_lb, r_ub = newX_lb, newX_ub
             break
     return r_lb, r_ub
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def canApproximate(overApprox):
+    randX = np.random.random(overApprox.nS)
+    f_lb, f_ub = fover(overApprox, randX, randX)
+    G_lb, G_ub = Gover(overApprox, randX, randX)
+    canApproxf = True
+    canApproxG = True
+    for i in range(f_lb.shape[0]):
+        if f_lb[i] == -np.inf or f_ub[i] == np.inf:
+            canApproxf = False
+            break
+    for i in range(G_lb.shape[0]):
+        for j in range(G_lb.shape[1]):
+            if G_lb[i,j] == -np.inf or G_ub[i,j] == np.inf:
+                canApproxG = False
+                break
+        if not canApproxG:
+            break
+    return canApproxf, canApproxG
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def nextStateOverApprox(b_lb, b_ub, A1_lb, A1_ub, A2_lb, A2_ub, uVal):
+    t1_lb, t1_ub = mul_Ms_i(A1_lb, A1_ub, uVal)
+    t2_lb, t2_ub = mul_Ms_i(A2_lb, A2_ub, uVal)
+    res_lb = np.empty(b_lb.shape[0], dtype=realN)
+    res_ub = np.empty(b_lb.shape[0], dtype=realN)
+    for i in prange(res_lb.shape[0]):
+        res_lb[i], res_ub[i] = and_i(t1_lb[i], t1_ub[i], t2_lb[i], t2_ub[i])
+    return b_lb + res_lb, b_ub + res_ub
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def controlAffineOverApprox(overApprox, x0, dt, uOver_lb, uOver_ub,
+            knownf=None, knownG=None, gradKnownf=None, gradKnownG=None,
+            gronwallCoeff=-1):
+
+    dt_2 = 0.5 * dt**2
+
+    # Compute f and G at the current point x0
+    fx_lb, fx_ub = fover(overApprox, x0, x0, knownf=knownf)
+    Gx_lb, Gx_ub = Gover(overApprox, x0, x0, knownG=knownG)
+
+    # COmpute h = f + G u
+    hApprox = add_i(fx_lb, fx_ub, *mul_iMv(Gx_lb, Gx_ub, uOver_lb, uOver_ub))
+
+    # Get the apriori enclosure
+    Si_lb, Si_ub = fixpoint(overApprox, x0, x0, dt, uOver_lb, uOver_ub,
+             knownf, knownG, hOver= hApprox, betaValCoeff=gronwallCoeff)
+
+    # Compute f and G at the a priori enclosure
+    fSi_lb, fSi_ub = fover(overApprox, Si_lb, Si_ub, knownf=knownf)
+    GSi_lb, GSi_ub = Gover(overApprox, Si_lb, Si_ub, knownG=knownG)
+    hSi_lb, hSi_ub = add_i(fSi_lb, fSi_ub, *mul_iMv(GSi_lb, GSi_ub, uOver_lb, uOver_ub))
+
+    # Obtain the approximation of the Jacobian of f
+    Jf_lb, Jf_ub = overApprox.Jf_lb, overApprox.Jf_ub
+    # Add the Jacobian of knownf if given
+    if gradKnownf is not None:
+        Jfx_lb, Jfx_ub = gradKnownf(Si_lb, Si_ub) # To change
+        Jf_lb = Jf_lb + Jfx_lb
+        Jf_ub = Jf_ub + Jfx_ub
+    # Obtain the approximation of the Jacobian of G
+    JG_lb, JG_ub = overApprox.JG_lb, overApprox.JG_ub
+    # Add the Jacobian of knownG if given
+    if gradKnownG is not None:
+        JGx_lb, JGx_ub = gradKnownG(Si_lb, Si_ub)
+        JG_lb = JG_lb + JGx_lb
+        JG_ub = JG_ub + JGx_ub
+
+    # Compute Bi
+    fx_lb *= dt
+    fx_ub *= dt
+    JfFsi_lb, JfFsi_ub = mul_iMv(Jf_lb, Jf_ub, fSi_lb, fSi_ub)
+    JfFsi_lb *= dt_2
+    JfFsi_ub *= dt_2
+    b_lb = x0 + fx_lb + JfFsi_lb
+    b_ub = x0 + fx_ub + JfFsi_ub
+
+    # Compute Ai
+    JG_t_lb = np.transpose(JG_lb,(0,2,1))
+    JG_t_ub = np.transpose(JG_ub,(0,2,1))
+    Gx_lb *= dt
+    Gx_ub *= dt
+
+    # Compute the term Gx*dt + ((Jf + JG U) GSi + JG^T fSi) * 0.5 * dt**2
+    sT1_lb, sT1_ub = mul_MM( *add_i(
+                        *mul_iTv(JG_lb, JG_ub, uOver_lb, uOver_ub),
+                        Jf_lb, Jf_ub
+                        ),
+                    GSi_lb, GSi_ub)
+    sT2_lb, sT2_ub = mul_iTv(JG_t_lb, JG_t_ub, fSi_lb, fSi_ub)
+    A1_lb = Gx_lb + (sT1_lb + sT2_lb) * dt_2
+    A1_ub = Gx_ub + (sT1_ub + sT2_ub) * dt_2
+
+    # Compute the term Gx*dt + (Jf GSi + JG^T (fSi + GSi U)) dt**2
+    sT3_lb, sT3_ub = mul_iTv(JG_t_lb, JG_t_ub, hSi_lb, hSi_ub)
+    sT4_lb, sT4_ub = mul_MM(Jf_lb, Jf_ub, GSi_lb, GSi_ub)
+    A2_lb = Gx_lb + (sT3_lb + sT4_lb) * dt_2
+    A2_ub = Gx_ub + (sT3_ub + sT4_ub) * dt_2
+
+    return b_lb, b_ub, A1_lb, A1_ub, A2_lb, A2_ub
 
 @jit(nopython=True, parallel=False, fastmath=True)
 def DaTaReachN(overApprox, x0_lb, x0_ub, t0, nPoint, dt, uOver, uDer,
@@ -414,7 +540,7 @@ def DaTaReachN(overApprox, x0_lb, x0_ub, t0, nPoint, dt, uOver, uDer,
         Ut_lb, Ut_ub = uOver(integTime[i-1], integTime[i-1])
         Ur_lb, Ur_ub = uOver(integTime[i-1], integTime[i])
         # Compute the a priori enclosure
-        rEncl_lb, rEncl_ub = fixpoint(overApprox, lastX_lb, lastX_ub, 
+        rEncl_lb, rEncl_ub = fixpoint(overApprox, lastX_lb, lastX_ub,
                                 dt, Ur_lb, Ur_ub, knownf, knownG)
         # Compute the function f(x_t) + G(x_t) u_t
         hx_lb, hx_ub = add_i(
@@ -432,14 +558,14 @@ def DaTaReachN(overApprox, x0_lb, x0_ub, t0, nPoint, dt, uOver, uDer,
         Jf_lb, Jf_ub = overApprox.Jf_lb, overApprox.Jf_ub
         # Add the Jacobian of knownf if given
         if fGradKnown is not None:
-            Jfx_lb, Jfx_ub = fGradKnown(lastX_lb, lastX_ub)
+            Jfx_lb, Jfx_ub = fGradKnown(rEncl_lb, rEncl_ub)
             Jf_lb += Jfx_lb
             Jf_ub += Jfx_ub
         # Obtain the approximation of the Jacobian of G
         JG_lb, JG_ub = overApprox.JG_lb, overApprox.JG_ub
         # Add the Jacobian of knownG if given
         if GGradKnown is not None:
-            JGx_lb, JGx_ub = GGradKnown(lastX_lb, lastX_ub)
+            JGx_lb, JGx_ub = GGradKnown(rEncl_lb, rEncl_ub)
             JG_lb += JGx_lb
             JG_ub += JGx_ub
         # Compute the second order term (Jf + Jg Ur) * (hr)

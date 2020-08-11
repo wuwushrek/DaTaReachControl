@@ -126,8 +126,8 @@ def DaTaReach(x0, t0, nPoint, dt, fOver, GOver, uOver, uDer, useFast=False):
         GEncl = GOver(rEncl)
         fr = fOver(rEncl) + np.matmul(GEncl, Ur)
         fx = fOver(lastX) + np.matmul(GOver(lastX), Ut)
-        sTerm = np.matmul((fOver.Jf(lastX) +
-                    np.tensordot(GOver.JG(lastX), Ur, axes=([1,0]))[:,:,0]),fr) \
+        sTerm = np.matmul((fOver.Jf(rEncl) +
+                    np.tensordot(GOver.JG(rEncl), Ur, axes=([1,0]))[:,:,0]),fr) \
                 + np.matmul(GEncl, uDer(Interval(integTime[i-1],integTime[i])))
         stateTime[:,i:(i+1)] = stateTime[:,(i-1):i] + fx * dt + sTerm * (0.5*dt**2)
     return integTime, stateTime

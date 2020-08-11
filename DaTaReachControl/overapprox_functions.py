@@ -72,7 +72,7 @@ class FOverApprox:
             xValDot = traj['xDot']
             uVal = traj['u']
             time = traj.get('t', [None for i in range(xVal.shape[1])])
-            for i in range(xVal.shape[1]):
+            for i in range(uVal.shape[1]):
                 self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)],
                             uVal[:,i:(i+1)], time[i])
         # Build the component over-approximation
@@ -330,7 +330,7 @@ class GOverApprox:
             xValDot = traj['xDot']
             uVal = traj['u']
             time = traj.get('t', [None for i in range(xVal.shape[1])])
-            for i in range(xVal.shape[1]):
+            for i in range(uVal.shape[1]):
                 self.update(xVal[:,i:(i+1)], xValDot[:,i:(i+1)],
                             uVal[:,i:(i+1)], time[i])
         # Build the component over-approximation
@@ -415,6 +415,7 @@ class GOverApprox:
         xVal, the derivatives xDotVal and the control uVal."""
 
         # Obtain the values of uVal that are non zeros
+        uVal[np.abs(uVal) < 1e-5] = 0
         (zVal, nzVal) = np.nonzero(uVal)
         # If there are multiples, the data can't be separated
         if zVal.shape[0] != 1:
@@ -444,7 +445,7 @@ class GOverApprox:
             for i in range(normVal.shape[0]):
                 normVal[i,:] = np.linalg.norm(
                     (self.Ej[nZInd][0]-xVal)[self.vDep[(i,nZInd)],:], axis=0)
-                zerosIndx = normVal[i,:] <= 1e-10
+                zerosIndx = normVal[i,:] <= 1e-5
                 normVal[i,zerosIndx] = -1 # Zero norm shoould generate neg Lip
             diffVal = np.abs(self.xDot[nZInd] - xModDot) / normVal
             diffVal = np.array([[diffVal[i,j].ub for j in range(diffVal.shape[1])] \
