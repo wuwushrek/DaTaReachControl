@@ -45,6 +45,8 @@ spec = [
     ('JG_ub', real[:,:,:]),
 
     ('xTraj', real[:,:]),
+    ('xDot', real[:,:]),
+    ('uVal', real[:,:]),
     ('fOverTraj_lb', real[:,:]),
     ('fOverTraj_ub', real[:,:]),
     ('GOverTraj_lb', real[:,:,:]),
@@ -116,6 +118,9 @@ class ReachDyn(object):
         self.nbData = 0
         self.dataCounter = 0
         self.xTraj = np.empty((self.nS, maxData), dtype=realN)
+        self.uVal = np.empty((self.nC, maxData), dtype=realN)
+        self.xDot = np.empty((self.nS, maxData), dtype=realN)
+
         self.fOverTraj_lb = np.empty((self.nS, maxData), dtype=realN)
         self.fOverTraj_ub = np.empty((self.nS, maxData), dtype=realN)
         self.GOverTraj_lb = np.empty((self.nS, self.nC, maxData), dtype=realN)
@@ -287,6 +292,27 @@ def Gover(overApprox, x_lb, x_ub, knownG=None):
     return res_lb, res_ub
 
 @jit(nopython=True, parallel=False, fastmath=True)
+def computeInvariantTraj(overApprox):
+    while True:
+        isInvariant = True
+        for i in range(overApprox.nbData):
+            xVal = overApprox.xTraj[:,i]
+            xDot = overApprox.xDot[:,i]
+            uVal = overApprox.uVal[:,i]
+            foverx = fover(overApprox, xVal, xVal)
+            Goverx = Gover(overApprox, xVal, xVal)
+            changed = updateTraj(xVal, xDot, uVal, *foverx, *Goverx)
+            overApprox.fOverTraj_lb[:, i] = foverx[0]
+            overApprox.fOverTraj_ub[:, i] = foverx[1]
+            overApprox.GOverTraj_lb[:, :, i] =  Goverx[0]
+            overApprox.GOverTraj_ub[:, :, i] =  Goverx[1]
+            if changed:
+                isInvariant = False
+        if isInvariant:
+            break
+
+
+@jit(nopython=True, parallel=False, fastmath=True)
 def update(overApprox, xVal, xDot, uVal, knownf=None, knownG=None):
     """ Update the over-approximation based on the new xVal, xDot, and
         the control u. The update is based on the HC4revise algorithm.
@@ -308,6 +334,8 @@ def update(overApprox, xVal, xDot, uVal, knownf=None, knownG=None):
         print('foverx-tight : \n', foverx)
         print('Goverx-tight : \n', Goverx)
     overApprox.xTraj[:,overApprox.dataCounter] = xVal
+    overApprox.xDot[:,overApprox.dataCounter] = xDot
+    overApprox.uVal[:,overApprox.dataCounter] = uVal
     overApprox.fOverTraj_lb[:, overApprox.dataCounter] = foverx[0]
     overApprox.fOverTraj_ub[:, overApprox.dataCounter] = foverx[1]
     overApprox.GOverTraj_lb[:, :, overApprox.dataCounter] =  Goverx[0]
@@ -317,7 +345,7 @@ def update(overApprox, xVal, xDot, uVal, knownf=None, knownG=None):
         overApprox.nbData += 1
     overApprox.dataCounter = \
         (overApprox.dataCounter + 1) % overApprox.xTraj.shape[1]
-
+    computeInvariantTraj(overApprox)
     # overApprox.xTraj = \
     #     np.concatenate((overApprox.xTraj,xVal.reshape(-1,1)),axis=1)
     # overApprox.fOverTraj_lb = np.concatenate((overApprox.fOverTraj_lb,

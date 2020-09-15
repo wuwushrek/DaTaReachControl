@@ -349,6 +349,7 @@ def norm_i(x_lb, x_ub):
 ########################################################################
 @jit(nopython=True, parallel=False, fastmath=True)
 def abs_i(x_lb, x_ub):
+    """ Compute the absolute value of an interval vector"""
     res = np.empty(x_lb.shape[0], dtype=realN)
     for i in prange(x_ub.shape[0]):
         res[i] = np.maximum(np.abs(x_lb[i]), np.abs(x_ub[i]))
@@ -356,9 +357,18 @@ def abs_i(x_lb, x_ub):
 
 @jit(nopython=True, parallel=False, fastmath=True)
 def contains_i(x_lb, x_ub, y_lb, y_ub):
+    """ Check if an interval x = [x_lb, x_ub] contains y = [y_lb, y_ub] """
     if np.abs(y_ub-y_lb) <= epsTolInt:
         y_lb = y_ub
     return x_lb-y_lb <= epsTolInt and x_ub-y_ub >= -epsTolInt
+
+@jit(nopython=True, parallel=False, fastmath=True)
+def isInside(xVal, x_lb, x_ub):
+    """ Check if the evctor xVal is inside the interval vector x = (x_lb, x_ub)"""
+    for i in prange(x_lb.shape[0]):
+        if xVal[i] > x_ub[i] or xVal[i] < x_lb[i]:
+            return False
+    return True
 ########################################################################
 
 # Predefined types of the Interval

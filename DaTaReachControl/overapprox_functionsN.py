@@ -32,7 +32,9 @@ def hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u):
     (indNZu,) = np.nonzero(u)
     # If the size of indNZu is zero then only f can be update
     if indNZu.shape[0] == 0:
-        return xdot_i, xdot_i
+        return xdot_i, xdot_i, (xdot_i != fx_i_lb or xdot_i != fx_i_ub)
+    # Boolean variable checking if a tighter set was obtained
+    hasChanged = False
     # Compute the elementwise product Gx_i u and use it as the nodes of the
     # tree for the HC4revise algorithm
     nGu_lb = np.empty(indNZu.shape[0]+1, dtype=realN)
@@ -62,6 +64,9 @@ def hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u):
             and_i(*sub_i(plusArray_lb[i], plusArray_ub[i], nlTerm_lb, nlTerm_ub),\
                     rTerm_lb, rTerm_ub)
         plusArray_lb[i-1], plusArray_ub[i-1] = nrTerm_lb, nrTerm_ub
+        if (nlTerm_lb != -np.inf and nlTerm_lb - nGu_lb[i+1] > epsTolInt) or \
+            (nlTerm_ub != np.inf and nlTerm_ub - nGu_ub[i+1] < -epsTolInt):
+            hasChanged = True
         nGu_lb[i+1], nGu_ub[i+1] = nlTerm_lb, nlTerm_ub
     # We have to update the last two nodes correctly
     lTerm_lb, lTerm_ub = nGu_lb[1], nGu_ub[1]
@@ -72,11 +77,17 @@ def hc4Revise(xdot_i, fx_i_lb, fx_i_ub, Gx_i_lb, Gx_i_ub, u):
     nrTerm_lb, nrTerm_ub = \
         and_i(*sub_i(plusArray_lb[0], plusArray_ub[0], nlTerm_lb, nlTerm_ub),\
             rTerm_lb, rTerm_ub)
+    if (nrTerm_lb != -np.inf and nrTerm_lb - nGu_lb[0] > epsTolInt) or \
+        (nrTerm_ub != np.inf and  nrTerm_ub - nGu_ub[0] < -epsTolInt):
+        hasChanged = True
     nGu_lb[0], nGu_ub[0] = nrTerm_lb, nrTerm_ub
+    if (nlTerm_lb != -np.inf and nlTerm_lb - nGu_lb[1] > epsTolInt) or \
+        (nlTerm_ub != np.inf and nlTerm_ub - nGu_ub[1] < -epsTolInt):
+        hasChanged = True
     nGu_lb[1], nGu_ub[1] = nlTerm_lb, nlTerm_ub
     # POst processing and return correct value format
     Gx_i_lb[indNZu], Gx_i_ub[indNZu] = mul_iv_sv(nGu_lb[:-1], nGu_ub[:-1], 1/u_red)
-    return nGu_lb[-1], nGu_ub[-1]
+    return nGu_lb[-1], nGu_ub[-1], hasChanged
 
 
 @jit(nopython=True, parallel=False, fastmath=True)
@@ -201,8 +212,12 @@ def Goverapprox(x_lb, x_ub, LipG, varDep, dataState, dataFun_lb, dataFun_ub):
 @jit(nopython=True, parallel=False, fastmath=True)
 def updateTraj(x, xdot, u, fxR_lb, fxR_ub, GxR_lb, GxR_ub):
     """ Given new data point, update your knowledge of f and G """
+    hasChanged = False
     for i in prange(x.shape[0]):
-        f_lb, f_ub = hc4Revise(xdot[i], fxR_lb[i], fxR_ub[i],
+        f_lb, f_ub, changed = hc4Revise(xdot[i], fxR_lb[i], fxR_ub[i],
                                     GxR_lb[i,:], GxR_ub[i,:], u)
         fxR_lb[i] = f_lb
         fxR_ub[i] = f_ub
+        if changed:
+            hasChanged = True
+    return hasChanged
