@@ -5,7 +5,7 @@ import traceback                    # For displaying caught exceptions
 
 class MyopicDataDrivenControl:
     """
-    Base class for one-step myopic control. This script is taken congol Python
+    Base class for a one-step control. This script is inspired by congol Python
     module available at https://github.com/abyvinod/congol
 
     Each subclass should populate its function
@@ -42,11 +42,11 @@ class MyopicDataDrivenControl:
         max_step = 1. In this case, the user must update the current_state to
         the next_state based on whichever was action
 
-        If ax is provided, it plots the evolution of the first two sets
+        If runtime_info is provided, it do whatever needs to be execute
+        by runtime_info on the fly (for example plotting, logging, etc...)
         """
         res = []
         # Loop till the maximum number of iterations have not been reached
-        iter_count = 0
         for iter_count in range(max_time_steps):
             if verbose:
                 print('\n' + str(iter_count) + '. ', end='')
@@ -81,36 +81,16 @@ class MyopicDataDrivenControl:
             past_input = current_decision               # Make it 2D
             self.current_state, self.current_state_der = \
                                 self.one_step_dyn(past_state, past_input)
+            self.current_state_der = self.current_state_der.reshape(1,-1)
+            self.current_state = self.current_state.reshape(1,-1)
             if runtime_info is not None:
                 runtime_info(p_state=past_state, p_input=past_input,
                     n_state=self.current_state, mt=self.marker_type,
                     mc = self.marker_color, ms=self.marker_default_size,
                     ml = self.marker_label, first= iter_count==0)
-            # If plotting is required
-            # if ax is not None:
-            #     ax.scatter(self.current_state[0, 0],
-            #                self.current_state[0, 1],
-            #                self.marker_default_size + iter_count,
-            #                marker=self.marker_type, color=self.marker_color,
-            #                zorder=self.zorder)
-            #     ax.plot([past_state[0, 0], self.current_state[0, 0]],
-            #             [past_state[0, 1], self.current_state[0, 1]], '-',
-            #             color=self.marker_color)
-            #     if not draw_plots_at_the_end:
-            #         plt.draw()
-            #         plt.pause(0.01)
 
             # Step 3: Break early if a user-provided exit condition is met
-            if self.exit_condition(past_state, past_input, self.current_state):
+            if self.exit_condition is not None and\
+                 self.exit_condition(past_state, past_input, self.current_state):
                 break
-
-        # Step 4: Update the legend based on the largest marker
-        # For size comparison between scatter and plot, see
-        # https://stackoverflow.com/a/47403507. Specifically, the marker size of
-        # plot is equal to scatter size squared!
-        # ax.plot([self.current_state[0, 0], self.current_state[0, 0]],
-        #         [self.current_state[0, 1], self.current_state[0, 1]],
-        #         '-' + self.marker_type,
-        #         ms=np.sqrt(self.marker_default_size + iter_count-1),
-        #         color=self.marker_color, label=self.marker_label)
         return res

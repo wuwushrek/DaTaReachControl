@@ -91,7 +91,7 @@ def acceleratedProjGradWithGradRestartScheme(Q, q, U_lb, U_ub, t=1.0, eps2=1e-12
         yk = xk1 + betaArr[indexRestart] * (xk1 - xk)
         xk = xk1
         diff_xk = c_diff
-    print(nIteration)
+    # print(nIteration)
     return xk, np.dot(xk, np.dot(Q, xk) + q)
 
 @jit(nopython=True, parallel=False, fastmath=True)

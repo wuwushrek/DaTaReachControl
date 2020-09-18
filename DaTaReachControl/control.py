@@ -41,8 +41,8 @@ class DaTaControl:
         xDotTraj = None, uTraj = None, useGronwall=False, verbOverApprox=False,
         knownf=None, knownG=None, gradKnownf=None, gradKnownG=None,
         fixpointWidenCoeff=0.2, zeroDiameter=1e-5, widenZeroInterval=1e-3,
-        maxData=20, tolChange=tolChange, verbSolver=False, verbCtrl=False, threshUpdateApprox=0.1,
-        coeffLearning=0.1, probLearning=[], params=None):
+        maxData=20, tolChange=tolChange, verbSolver=False, verbCtrl=False,
+        threshUpdateApprox=0.1, coeffLearning=0.1, probLearning=[], params=None):
 
         # Build the Overaproximation model
         self.overApprox = initOverApprox(Lf, LG, Lfknown, LGknown, nvDepF,
@@ -86,7 +86,7 @@ class DaTaControl:
         self.initializeOptimizer(params)
 
         # Update cost function and create underlying optimizations problems
-        self.updateCost(Q, q, R, S, r)
+        self.updateCost(Q, S, R, q, r)
 
         # Check if there's sufficient data to approximate f and G
         self.canDoApprox = canApproximate(self.overApprox)
@@ -148,8 +148,11 @@ class DaTaControl:
     def updateScalingGronwall(self):
         """Compute the coefficient coeffDt needed to returning the
         a priori enclosure by gronwall theorem"""
-        self.betaValCoeff = getCoeffGronwall(self.overApprox, self.dt, self.U_lb,
-                                        self.U_ub)
+        if self.overApprox.useGronwall:
+            self.betaValCoeff = getCoeffGronwall(self.overApprox, self.dt, self.U_lb,
+                                    self.U_ub)
+        else:
+            self.betaValCoeff = 0
 
     def noInitialData(self):
         """ When there's no initial data, perform control to generate

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.optimize as spo
-from MyopicDataDrivenControl import MyopicDataDrivenControl
+from .MyopicDataDrivenControl import MyopicDataDrivenControl
 import time
 
 
@@ -54,7 +54,7 @@ class MyopicDataDrivenControlTrue(MyopicDataDrivenControl):
         # Compute the decision
         query_timer_start = time.time()
         res = spo.minimize(
-                lambda u: self.objective(self.current_state[0, :], u),
+                lambda u: self.objective(self.current_state, u),
                 initial_action, bounds=self.bounds, method=self.solver_style)
         current_decision = np.array([res.x])
         query_timer_end = time.time()
