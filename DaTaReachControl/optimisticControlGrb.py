@@ -80,7 +80,7 @@ def getQuadraticCost(x_var, u, Q, S, R, q, r):
     res.addTerms(linearCoeff, linearVar)
     return res
 
-def initOptimisticProblem(nS, nC, Q, S, R, q, r, U_lb, U_ub):
+def initOptimisticProblemGrb(nS, nC, Q, S, R, q, r, U_lb, U_ub):
     """ Build the initial Gurobi model based on separating the
         control input U into positve and negative orthants.
         The separation creates 2^q problems to solve, q is the number
@@ -148,18 +148,25 @@ def updateCost(Q, S, R, q, r):
         mOpt.setObjective(costVal)
         mModels[nbProblem] = (mOpt, costVal)
 
-def solveOptimisticProblem(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub,
+def solveOptimisticProblemGrb(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub,
             U_lb, U_ub, learnInd, verbose=True):
     """ Given the values of Al, bl, the possible imposed learnConstr,
         compute a solution of the near-optimal control problem
     """
     # In case we are learning the function f, the control value should be 0
     if learnInd == -1:
-        return np.zeros(U_lb.shape[0], dtype=realN), 0.0
+        retZero = True
+        for j in range(U_lb.shape[0]):
+            if not (U_ub[j] >= 0 and U_lb[j] <= 0):
+                retZero = False
+                break
+        if retZero:
+            return np.zeros(U_lb.shape[0]), 0.0
 
     global dictU, mModels, dictConstr
     minCost = np.inf
     uOpt = None
+
     learnConstr = np.zeros(U_lb.shape[0])
     if learnInd >= 0:
         learnConstr = np.full(U_lb.shape[0],1)
@@ -167,6 +174,27 @@ def solveOptimisticProblem(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub,
 
     for nbProblem, (u, x_var, d) in dictU.items():
         (mOpt, costVal) = mModels[nbProblem]
+        # Constraints on the control variable u
+        nextIter = False
+        for j, uj in enumerate(u):
+            if d[j]:
+                if  U_ub[j] <= 0:
+                    nextIter = True
+                    break
+                uj.lb = np.maximum(0, U_lb[j])
+                uj.ub = np.maximum(0, U_ub[j])
+            else:
+                if U_lb[j] >= 0:
+                    nextIter = True
+                    break
+                uj.lb = np.minimum(0, U_lb[j])
+                uj.ub = np.minimum(0, U_ub[j])
+            if (learnConstr[j] == 0) or\
+                (learnConstr[j] == 1 and (U_ub[j] >= 0 and U_lb[j] <= 0)):
+                c3 = dictConstr[(nbProblem, -j-1)]
+                mOpt.chgCoeff(c3, uj, learnConstr[j])
+        if nextIter:
+            continue
         for i , x_i in enumerate(x_var):
             (c1, c2, c3, c4) = dictConstr[(nbProblem,i)]
             c1.RHS = -b_ub[i]
@@ -184,11 +212,6 @@ def solveOptimisticProblem(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub,
                     mOpt.chgCoeff(c2, uj, A1_ub[i,j])
                     mOpt.chgCoeff(c3, uj, A2_lb[i,j])
                     mOpt.chgCoeff(c4, uj, A2_ub[i,j])
-        # Constraints on the control variable u
-        for j, uj in enumerate(u):
-            if learnConstr is not None:
-                c3 = dictConstr[(nbProblem, -j-1)]
-                mOpt.chgCoeff(c3, uj, learnConstr[j])
         mOpt.Params.OutputFlag = verbose
         mOpt.optimize()
         currCost = costVal.getValue()

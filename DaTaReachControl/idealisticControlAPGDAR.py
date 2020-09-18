@@ -95,15 +95,29 @@ def acceleratedProjGradWithGradRestartScheme(Q, q, U_lb, U_ub, t=1.0, eps2=1e-12
     return xk, np.dot(xk, np.dot(Q, xk) + q)
 
 @jit(nopython=True, parallel=False, fastmath=True)
-def solveWeightedProblemAPGDAR(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_ub,
+def solveIdealisticProblemAPGDAR(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_ub,
     learnInd, Q, S, R, q, r, w1, w2, w3, epsTol):
     """ Solve the one-step optimal control problem using accelearted projected
         gradient descent.
         epsTol : provides a desired accuracy to the optimal cost |f - f*| <= sqrt(epsTol)
     """
     # In case we are learning the function f, the control value should be 0
-    if learnInd == -1:
-        return np.zeros(U_lb.shape[0], dtype=realN), 0.0
+    retZero = True
+    justOneToLearn = True
+    new_U_lb = U_lb.copy()
+    new_U_ub = U_ub.copy()
+    for j in range(U_lb.shape[0]):
+        if not (U_ub[j] >= 0 and U_lb[j] <= 0):
+            retZero = False
+            if j != learnInd:
+                justOneToLearn = False
+        else:
+            if learnInd >= 0 and j != learnInd:
+                new_U_lb[j] = 0
+                new_U_ub[j] = 0
+
+    if learnInd == -1 and retZero:
+        return np.zeros(U_lb.shape[0]), 0.0
 
     # Weighted center matrices A and weight vector B
     coeffSup = w3*w1 + (1-w3)*w2
@@ -122,7 +136,7 @@ def solveWeightedProblemAPGDAR(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_u
     # In case we are doing the learning -> Only one component (l0) of
     # the control is valid and the problem is reduced to
     # Qt_{l0}{l0} u_{l0}**2 + qt_{l0} u_{l0}
-    if learnInd >= 0:
+    if learnInd >= 0 and justOneToLearn:
         resU = np.zeros(U_lb.shape[0], dtype=realN)
         a = Qt[learnInd,learnInd]
         b = qt[learnInd]
@@ -146,4 +160,4 @@ def solveWeightedProblemAPGDAR(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_u
 
     # If we are not learning, solve the optimization problem
     tVal = 1.0/upperBoundEigen(Qt)
-    return acceleratedProjGradWithGradRestartScheme(Qt, qt, U_lb, U_ub, tVal, epsTol)
+    return acceleratedProjGradWithGradRestartScheme(Qt, qt, new_U_lb, new_U_ub, tVal, epsTol)

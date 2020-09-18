@@ -12,7 +12,13 @@ objPb = 0
 # # Cost function parameters
 # Qc, Rc, Sc, qc, rc = None, None, None, None, None
 
-def initMidpointProblem(U_lb, U_ub):
+def updateControlRange(U_lb, U_ub):
+    global uVar
+    for i, ui in enumerate(uVar):
+        ui.lb = U_lb[i]
+        ui.ub = U_ub[i]
+
+def initIdealisticProblemGrb(U_lb, U_ub):
     global dictConstr, mOpt, uVar, objPb
     # , Qc, Rc, Sc, qc, rc
     dictConstr = dict()
@@ -80,21 +86,36 @@ def updateCost(u, A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, Qc, Sc, Rc, qc, rc, w1
     # res.addConstant(pt)
     return res
 
-def solveWeightedProblem(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_ub,
+def solveIdealisticProblemGrb(A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub, U_lb, U_ub,
                             learnInd, Q, S, R, q, r, w1, w2, w3, verbose=True):
     global uVar, objPb, dictConstr, mOpt
     if learnInd == -1:
-        return np.zeros(U_lb.shape[0]), 0.0
+        retZero = True
+        for j in range(U_lb.shape[0]):
+            if not (U_ub[j] >= 0 and U_lb[j] <= 0):
+                retZero = False
+                break
+        if retZero:
+            return np.zeros(U_lb.shape[0]), 0.0
+
+    for i, ui in enumerate(uVar):
+        ui.lb = U_lb[i]
+        ui.ub = U_ub[i]
+
     objPb = updateCost(uVar, A1_lb, A1_ub, A2_lb, A2_ub, b_lb, b_ub,
                         Q, S, R, q, r, w1, w2, w3)
     mOpt.setObjective(objPb)
+
     learnConstr = np.zeros(U_lb.shape[0])
     if learnInd >= 0:
         learnConstr = np.full(U_lb.shape[0],1)
         learnConstr[learnInd] = 0
+
     for j, uj in enumerate(uVar):
-        c3 = dictConstr[-j-1]
-        mOpt.chgCoeff(c3, uj, learnConstr[j])
+        if (learnConstr[j] == 0) or\
+            (learnConstr[j] == 1 and (U_ub[j] >= 0 and U_lb[j] <= 0)):
+            c3 = dictConstr[-j-1]
+            mOpt.chgCoeff(c3, uj, learnConstr[j])
     mOpt.Params.OutputFlag = verbose
     mOpt.optimize()
     currCost = objPb.getValue()
