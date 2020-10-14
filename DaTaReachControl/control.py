@@ -41,14 +41,15 @@ class DaTaControl:
         xDotTraj = None, uTraj = None, useGronwall=False, verbOverApprox=False,
         knownf=None, knownG=None, gradKnownf=None, gradKnownG=None,
         fixpointWidenCoeff=0.2, zeroDiameter=1e-5, widenZeroInterval=1e-3,
-        maxData=20, tolChange=tolChange, verbSolver=False, verbCtrl=False,
-        threshUpdateApprox=0.1, coeffLearning=0.1, probLearning=[], params=None):
+        maxData=20, tolChange=tolChange, maxInvariantIter=10,
+        verbSolver=False, verbCtrl=False, threshUpdateApprox=0.1,
+        coeffLearning=0.1, probLearning=[], params=None):
 
         # Build the Overaproximation model
         self.overApprox = initOverApprox(Lf, LG, Lfknown, LGknown, nvDepF,
             nvDepG, bf, bG, bGf, bGG, xTraj, xDotTraj, uTraj, useGronwall,
             verbOverApprox, knownf, knownG, fixpointWidenCoeff, zeroDiameter,
-            widenZeroInterval, maxData, tolChange)
+            widenZeroInterval, maxData, tolChange, maxInvariantIter)
 
         # Save the known parts of the dynamic
         self.knownf = knownf

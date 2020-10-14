@@ -53,12 +53,12 @@ class MyopicDataDrivenControlDaTaControl(MyopicDataDrivenControl):
         self.delta_time = delta_time
 
         self.synth_control = DaTaControl(delta_time, Lf, LG, input_lb, input_ub, Q=Q,
-            q=q, R=R, S=S, r=r, xTraj=self.trajectory,
+            q=q, R=R, S=S, r=r, xTraj=self.trajectory, tolChange=1e-2,
             xDotTraj = self.trajectory_der, uTraj = self.input_seq, nvDepF=nDepf,
             nvDepG=nDepG, useGronwall=useGronwall, verbOverApprox=False,
             verbCtrl=verbCtrl, knownG=knownGfun, verbSolver=False,
             threshUpdateApprox=threshUpdateApprox, coeffLearning=0.1,
-            probLearning=[0.1,0.8,0.1], maxData=20, params=params)
+            probLearning=[0.1,0.8,0.1], maxData=maxData, params=params)
 
 
         # Constants

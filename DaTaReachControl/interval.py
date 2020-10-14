@@ -361,6 +361,13 @@ def pow2_i(x_lb, x_ub):
         return x_lb**2, x_ub**2
     return 0.0, np.maximum(x_lb**2,x_ub**2)
 
+@jit(types.UniTuple(real,2)(real, real, real),\
+    nopython=True, parallel=False, fastmath=True)
+def powr_i(x_lb, x_ub, ep):
+    """ Compute x^ep for the given interval x=(x_lb, x_ub)"""
+    assert x_lb > epsTolInt and ep > 0
+    return np.power(x_lb, ep), np.power(x_ub, ep)
+
 @jit(types.UniTuple(real,2)(real[:], real[:]),\
     nopython=True, parallel=False, fastmath=True)
 def norm_i(x_lb, x_ub):

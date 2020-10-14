@@ -1,0 +1,41 @@
+% This file was created by tikzplotlib v0.9.1.
+\begin{tikzpicture}
+
+\begin{axis}[
+legend cell align={left},
+legend style={fill opacity=0.8, draw opacity=1, text opacity=1, at={(0,1)}, anchor=south west, draw=white!80!black},
+tick align=outside,
+tick pos=left,
+x grid style={white!69.0196078431373!black},
+xlabel={\(\displaystyle \mathrm{Time\ (seconds)}\)},
+xmajorgrids,
+xmin=-0.005, xmax=0.105,
+xtick style={color=black},
+xtick={-0.02,0,0.02,0.04,0.06,0.08,0.1,0.12},
+xticklabels={−0.02,0.00,0.02,0.04,0.06,0.08,0.10,0.12},
+y grid style={white!69.0196078431373!black},
+ylabel={\(\displaystyle \mathrm{h}\)},
+ymajorgrids,
+ymin=99.9999777943842, ymax=100.000130264121,
+ytick style={color=black},
+ytick={99.99996,99.99998,100,100.00002,100.00004,100.00006,100.00008,100.0001,100.00012,100.00014},
+yticklabels={−0.00004,−0.00002,0.00000,0.00002,0.00004,0.00006,0.00008,0.00010,0.00012,0.00014}
+]
+\addplot [semithick, blue, mark=square*, mark size=2.5, mark options={solid}, only marks]
+table {%
+0 100
+0.01 100
+0.02 99.9999934958438
+0.03 99.9999847248268
+0.04 99.9999878726625
+0.05 99.9999988325345
+0.06 100.000009783123
+0.07 100.000029191794
+0.08 100.00005926229
+0.09 100.000091359466
+0.1 100.000123333678
+};
+\addlegendentry{$\mathscr{T}_{10}$}
+\end{axis}
+
+\end{tikzpicture}

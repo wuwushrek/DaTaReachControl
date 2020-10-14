@@ -58,7 +58,8 @@ spec = [
     ('fixpointWidenCoeff', real),
     ('zeroDiameter', real),
     ('widenZeroInterval', real),
-    ('tolChange', real)
+    ('tolChange', real),
+    ('maxInvariantIter', indType)
 ]
 
 @jitclass(spec)
@@ -75,7 +76,8 @@ class ReachDyn(object):
         bGf = depTypeGradF, bGG=depTypeGradG, xTraj=None,
         xDotTraj = None, uTraj = None, useGronwall=False, verbose=False,
         fixpointWidenCoeff=0.2, zeroDiameter=1e-5,
-        widenZeroInterval=1e-3, maxData=20, tolChange=tolChange):
+        widenZeroInterval=1e-3, maxData=20,
+        tolChange=tolChange, maxInvariantIter=10):
         # Save the number of state and control
         self.nS = Lf.shape[0]
         self.nC = LG.shape[1]
@@ -133,6 +135,7 @@ class ReachDyn(object):
         self.zeroDiameter = zeroDiameter
         self.widenZeroInterval = widenZeroInterval
         self.tolChange = tolChange
+        self.maxInvariantIter = maxInvariantIter
 
 
 @jit(nopython=True, parallel=False, fastmath=True)
@@ -141,14 +144,15 @@ def initOverApprox(Lf, LG, Lfknown=None, LGknown=None, nvDepF=depTypeF,
         bGG=depTypeGradG, xTraj=None, xDotTraj = None, uTraj = None,
         useGronwall=False, verbose=False, fknown=None, Gknown=None,
         fixpointWidenCoeff=0.2, zeroDiameter=1e-5,
-        widenZeroInterval=1e-3, maxData=20, tolChange=tolChange):
+        widenZeroInterval=1e-3, maxData=20,
+        tolChange=tolChange, maxInvariantIter=10):
     """ Initialize an object containing all the side information and Trajectory
     needed to compute the overapproximation of f and G
     """
     overApprox = ReachDyn(Lf, LG, Lfknown, LGknown, nvDepF,
                  nvDepG, bf, bG, bGf, bGG, xTraj, xDotTraj, uTraj,
                  useGronwall, verbose, fixpointWidenCoeff, zeroDiameter,
-                 widenZeroInterval, maxData, tolChange)
+                 widenZeroInterval, maxData, tolChange, maxInvariantIter)
 
     # Update the Lipschitz constant of the Known function
     updateKnownLip(overApprox, Lfknown, LGknown)
@@ -292,7 +296,8 @@ def Gover(overApprox, x_lb, x_ub, knownG=None):
 
 @jit(nopython=True, parallel=False, fastmath=True)
 def computeInvariantTraj(overApprox):
-    while True:
+    iterVal = 0
+    for iterVal in range(overApprox.maxInvariantIter):
         isInvariant = True
         for i in range(overApprox.nbData):
             xVal = overApprox.xTraj[i,:]
@@ -309,6 +314,7 @@ def computeInvariantTraj(overApprox):
             if changed:
                 isInvariant = False
         if isInvariant:
+            # print('Iteration: ', iterVal)
             break
 
 

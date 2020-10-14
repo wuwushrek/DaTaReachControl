@@ -18,6 +18,11 @@ import matplotlib.pyplot as plt
 if save_plot_tex:
     import tikzplotlib
 
+if realtime_plot:
+  m_run_time_plot = runtimePlot
+else:
+  m_run_time_plot = None
+
 # Warm-up for Numba the compile the code for later execution
 # Should not be includded in the computation time --> compilation time
 training_data_DaTa = {'trajectory': rand_init_traj_vec,
@@ -35,7 +40,7 @@ DaTa_ddc = MyopicDataDrivenControlDaTaControl(training_data_DaTa,
                   threshUpdateApprox=threshUpdateLearn, verbCtrl=False,
                   params=params_solver)
 res_DaTa_ddc = DaTa_ddc.solve(5,
-                        runtime_info=None, verbose=True)
+                        runtime_info=None, verbose=False)
 
 # Draw the initial environment and the initial random trajectory
 ax = drawInitialPlot(xlim_tup, ylim_tup, target_position, cost_thresh,
@@ -55,7 +60,7 @@ true_ddc = MyopicDataDrivenControlTrue(training_data,
                                        exit_condition=exitCondition)
 
 res_true_ddc = true_ddc.solve(max_iteration,
-                                runtime_info=runtimePlot, verbose=True)
+                                runtime_info=m_run_time_plot, verbose=True)
 
 # Solve the problem using SINDyc ##############################################
 sindyc_ddc = MyopicDataDrivenControlSINDYc(training_data,
@@ -67,7 +72,7 @@ sindyc_ddc = MyopicDataDrivenControlSINDYc(training_data,
                                            exit_condition=exitCondition,
                                            cvxpy_args=cvxpy_args_sindyc)
 res_sindyc_ddc = sindyc_ddc.solve(max_iteration,
-                            runtime_info=runtimePlot, verbose=True)
+                            runtime_info=m_run_time_plot, verbose=True)
 
 # Solve the problem using CGP-LCB #############################################
 gp_ddc = MyopicDataDrivenControlContextGP(training_data,
@@ -79,7 +84,7 @@ gp_ddc = MyopicDataDrivenControlContextGP(training_data,
                                          exit_condition=exitCondition,
                                          solver_style=acquistion_type)
 res_gp_ddc = gp_ddc.solve(max_iteration,
-                            runtime_info=runtimePlot, verbose=True)
+                            runtime_info=m_run_time_plot, verbose=True)
 
 # Solve the problem using C2Opt #############################################
 # Compute the context+input vector and the associated costs and the gradients
@@ -106,7 +111,7 @@ c2opt_ddc = MyopicDataDrivenControlC2Opt(training_data_c2opt,
                   exit_condition=exitCondition,
                   solver=solver_str_c2opt)
 res_c2opt_ddc = c2opt_ddc.solve(max_iteration,
-                            runtime_info=runtimePlot, verbose=True)
+                            runtime_info=m_run_time_plot, verbose=True)
 
 # Solve the problem using DaTaControl ########################################
 training_data_DaTa = {'trajectory': rand_init_traj_vec,
@@ -124,18 +129,7 @@ DaTa_ddc = MyopicDataDrivenControlDaTaControl(training_data_DaTa,
                   threshUpdateApprox=threshUpdateLearn, verbCtrl=False,
                   params=params_solver)
 res_DaTa_ddc = DaTa_ddc.solve(max_iteration,
-                        runtime_info=runtimePlot, verbose=True)
-
-ax = plt.gca()
-handles, labels = ax.get_legend_handles_labels()
-ax.legend(handles, labels, bbox_to_anchor=(1,0.5), loc='center left',
-            ncol=1, labelspacing = 0.25, framealpha = 1)
-plt.draw()
-plt.pause(0.01)
-plt.tight_layout()
-plt.savefig(log_file+"_trajectory"+log_extension_file, transparent=True)
-if save_plot_tex:
-    tikzplotlib.save(log_file+"_trajectory.tex")
+                        runtime_info=m_run_time_plot, verbose=True)
 
 # Retrieve the optimal trajectory
 opt_traj_vec = true_ddc.trajectory
@@ -168,6 +162,35 @@ data_traj_vec = DaTa_ddc.trajectory
 data_traj_vec = np.vstack((data_traj_vec,DaTa_ddc.current_state))
 data_cost_vec = computeCost(data_traj_vec)
 
+# Plot the trajectories
+ax = plt.gca()
+if not realtime_plot:
+  ax.plot(opt_traj_vec[:,0], opt_traj_vec[:,1], linestyle='-',
+    marker=true_ddc.marker_type, markerSize=true_ddc.marker_default_size,
+    color=true_ddc.marker_color, label=true_ddc.marker_label)
+  ax.plot(sindyc_traj_vec[:,0], sindyc_traj_vec[:,1], linestyle='-',
+    marker=sindyc_ddc.marker_type, color=sindyc_ddc.marker_color,
+    markerSize=sindyc_ddc.marker_default_size, label=sindyc_ddc.marker_label)
+  ax.plot(gpyopt_traj_vec[:,0], gpyopt_traj_vec[:,1], linestyle='-',
+    marker=gp_ddc.marker_type, color=gp_ddc.marker_color,
+    markerSize=gp_ddc.marker_default_size, label=gp_ddc.marker_label)
+  ax.plot(c2opt_traj_vec[:,0], c2opt_traj_vec[:,1], linestyle='-',
+    marker=c2opt_ddc.marker_type, color=c2opt_ddc.marker_color,
+    markerSize=c2opt_ddc.marker_default_size, label=c2opt_ddc.marker_label)
+  ax.plot(data_traj_vec[:,0], data_traj_vec[:,1], linestyle='-',
+    marker=DaTa_ddc.marker_type, color=DaTa_ddc.marker_color,
+    markerSize=DaTa_ddc.marker_default_size, label=DaTa_ddc.marker_label)
+
+ax.legend(loc='center left', ncol=1, labelspacing=0.25, framealpha=1,
+              bbox_to_anchor=(1.,0.5))
+plt.draw()
+plt.pause(0.01)
+plt.tight_layout()
+plt.savefig(log_file+"_trajectory"+log_extension_file, transparent=True)
+if save_plot_tex:
+    tikzplotlib.save(log_file+"_trajectory.tex")
+
+# Plot the cost function
 fig = plt.figure()
 plt.plot(opt_cost_vec, linestyle='-', marker=true_ddc.marker_type,
             markerSize=true_ddc.marker_default_size, color=true_ddc.marker_color,

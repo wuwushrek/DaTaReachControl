@@ -6,7 +6,7 @@ from DaTaReachControl import synthNextState, generateTraj,\
                             IDEALISTIC_APG, IDEALISTIC_GRB, OPTIMISTIC_GRB
 
 # Define a seed for repeatability
-np.random.seed(1013) # 3372 (good) 912, 1195, 458 # 1013 (bad)
+np.random.seed(1882) # 3372 (good)  # 1013 (bad), 1882
 # val = int(np.random.uniform(0,4000))
 # print (val)
 # np.random.seed(val)
@@ -32,15 +32,15 @@ n_data_max = 10
 
 # max number of iteration
 # max_iteration = 150 - n_data_max
-max_iteration = 200 - n_data_max
+max_iteration = 150 - n_data_max
 
 # Input bounds
 v_max = 3
 w_max = 0.5 * (2*np.pi)
 v_min = -v_max
 w_min = -w_max
-input_lb = np.array([v_min, w_min])
-input_ub = np.array([v_max, w_max])
+input_lb = np.array([v_min, w_min], dtype=np.float64)
+input_ub = np.array([v_max, w_max], dtype=np.float64)
 
 # Generate random input sequence --> put some random zero
 # in some direction of the control to have a trajectory with certain quality
@@ -71,10 +71,12 @@ rand_init_traj_vec, rand_init_traj_der_vec = generateTraj(fFun, GFun, initial_st
                                             rand_init_input_vec, sampling_time, 1)
 
 # This might need to be adjust depending on the seed --> Dimension of the grid
-# xlim_tup = [-4,1.5]
+# xlim_tup = [-3,1.5]
 # ylim_tup = [-3.9,1.0]
-xlim_tup = [-4,2.5]
-ylim_tup = [-3.9,4.2]
+# xlim_tup = [-3,1]
+# ylim_tup = [-3.9,2]
+xlim_tup = [-3,1.5]
+ylim_tup = [-4.5,1.5]
 
 # Bounds on the context and the input
 context_u_lb = np.hstack((np.array([xlim_tup[0], ylim_tup[0], -1, -1]), input_lb))
@@ -244,7 +246,7 @@ solver_str_c2opt = 'cvxpy'
 
 # DaTaControl parameters for the unicycle ############################
 useGronwall = False
-maxData = 15
+maxData = 10
 threshUpdateLearn = 0.5
 params_solver = (IDEALISTIC_APG, 0.7, 0.7, 0.7, 1e-6)
 # params_solver = (IDEALISTIC_GRB, 0.7, 0.7, 0.7)
@@ -270,10 +272,12 @@ target_markersize=30
 initstate_markersize =30
 
 # File prefix name for logging
-log_file="unicycle_dyn_bad"
+log_file="unicycle_dyn_crap"
 log_extension_file=".png"
+
 # Save plot in a tex file
 save_plot_tex = True
+realtime_plot = False
 
 def drawInitialPlot(xlim_tup, ylim_tup, target_position, cost_thresh,
                       initial_state, rand_init_traj_vec):
@@ -331,9 +335,9 @@ def drawInitialPlot(xlim_tup, ylim_tup, target_position, cost_thresh,
     plt.tight_layout()
     return ax
 
-def runtimePlot(p_state, p_input, n_state, mt, mc, ms, ml,first=False):
+def runtimePlot(p_state, p_input, n_state, mt, mc, ms, ml, iterVal=0):
     ax = plt.gca()
-    if first:
+    if iterVal == 0:
         ax.plot([p_state[0, 0], n_state[0, 0]],
             [p_state[0, 1], n_state[0, 1]], linestyle='-', marker=mt,
             markerSize=ms, color=mc, label=ml)
@@ -344,7 +348,7 @@ def runtimePlot(p_state, p_input, n_state, mt, mc, ms, ml,first=False):
             [p_state[0, 1], n_state[0, 1]], linestyle='-', marker=mt,
             markerSize=ms, color=mc)
     plt.draw()
-    plt.pause(0.01)
+    plt.pause(0.001)
 
 if __name__ == "__main__":
     drawInitialPlot(xlim_tup, ylim_tup, target_position, cost_thresh,

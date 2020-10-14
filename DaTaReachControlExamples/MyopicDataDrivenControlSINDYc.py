@@ -15,7 +15,7 @@ class MyopicDataDrivenControlSINDYc(MyopicDataDrivenControl):
     def __init__(self, training_data, input_lb, input_ub, cvxpy_objective,
             sampling_time, one_step_dyn=None, exit_condition=None,
             cvxpy_args=None, sparse_thresh=1e-3, eps_thresh=1e-12,
-            scaling_sparse_min=1e5, scaling_sparse_max = 1e-6,
+            scaling_sparse_min=1e-6, scaling_sparse_max = 1e5,
             libraryFun=defaultLib):
         """
         self.trajectory excludes the current state

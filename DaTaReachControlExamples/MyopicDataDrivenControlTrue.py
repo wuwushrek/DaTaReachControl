@@ -45,7 +45,8 @@ class MyopicDataDrivenControlTrue(MyopicDataDrivenControl):
 
         # Alternative initial action guess
         #   np.mean(np.vstack((self.bounds.lb, self.bounds.ub)), axis=0)
-        initial_action = self.bounds.lb
+        initial_action = np.random.rand(self.input_seq.shape[1]) * (self.bounds.ub-self.bounds.lb)\
+                         + self.bounds.lb
         if verbose:
             print('Current state: {:s} | Initial action guess: {:s}'.format(
                 np.array_str(self.current_state, precision=2),
@@ -53,9 +54,12 @@ class MyopicDataDrivenControlTrue(MyopicDataDrivenControl):
 
         # Compute the decision
         query_timer_start = time.time()
+        # minimizer_args = {"method" : "L-BFGS-B", "bounds" : self.bounds}
         res = spo.minimize(
                 lambda u: self.objective(self.current_state, u),
                 initial_action, bounds=self.bounds, method=self.solver_style)
+        # res = spo.basinhopping( lambda u: self.objective(self.current_state, u),
+        #     initial_action, minimizer_kwargs=minimizer_args, niter=100)
         current_decision = np.array([res.x])
         query_timer_end = time.time()
         query_time = query_timer_end - query_timer_start

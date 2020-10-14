@@ -87,7 +87,7 @@ class MyopicDataDrivenControl:
                 runtime_info(p_state=past_state, p_input=past_input,
                     n_state=self.current_state, mt=self.marker_type,
                     mc = self.marker_color, ms=self.marker_default_size,
-                    ml = self.marker_label, first= iter_count==0)
+                    ml = self.marker_label, iterVal= iter_count)
 
             # Step 3: Break early if a user-provided exit condition is met
             if self.exit_condition is not None and\
